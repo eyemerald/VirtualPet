@@ -28,3 +28,7 @@ bin/
 
 ### Mac OS ###
 .DS_Store
+### VirtuaPet (archivos generados por el propio programa, no código) ###
+virtuapet.db
+*.pdf
+.idea/libraries/
