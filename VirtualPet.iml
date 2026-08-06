@@ -9,5 +9,13 @@
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="library" name="sqlite-jdbc-3.53.2.0" level="project" />
     <orderEntry type="library" name="pdfbox-app-3.0.8" level="project" />
+    <orderEntry type="library" name="javafx.base" level="project" />
+    <orderEntry type="library" name="javafx.controls" level="project" />
+    <orderEntry type="library" name="javafx.fxml" level="project" />
+    <orderEntry type="library" name="javafx.graphics" level="project" />
+    <orderEntry type="library" name="javafx.media" level="project" />
+    <orderEntry type="library" name="javafx.swing" level="project" />
+    <orderEntry type="library" name="javafx.web" level="project" />
+    <orderEntry type="library" name="javafx-swt" level="project" />
   </component>
 </module>

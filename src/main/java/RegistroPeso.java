@@ -1,6 +1,16 @@
     import java.time.LocalDate;
 
     public class RegistroPeso {
+        private LocalDate fecha;
+        private double peso;
+        private String notas;
+
+        public RegistroPeso(LocalDate fecha, double peso, String notas) {
+            this.fecha = fecha;
+            this.peso = peso;
+            this.notas = notas;
+        }
+
         public LocalDate getFecha() {
             return fecha;
         }
@@ -22,16 +32,6 @@
         }
 
         public void setNotas(String notas) {
-            this.notas = notas;
-        }
-
-        private LocalDate fecha;
-        private double peso;
-        private String notas;
-
-        public RegistroPeso(LocalDate fecha, double peso, String notas) {
-            this.fecha = fecha;
-            this.peso = peso;
             this.notas = notas;
         }
     }

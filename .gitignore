@@ -32,3 +32,13 @@ bin/
 virtuapet.db
 *.pdf
 .idea/libraries/
+
+### VirtuaPet - Maven ###
+target/
+
+### VirtuaPet - Logs ###
+*.log
+
+### VirtuaPet - IDE (config personal, no debe compartirse) ###
+.idea/
+*.iml

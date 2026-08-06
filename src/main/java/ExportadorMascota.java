@@ -10,24 +10,23 @@ import java.util.ArrayList;
 public class ExportadorMascota {
 
     // Método de ayuda: escribe UNA línea de texto en la posición (x, y) indicada.
-    // Cada línea es su propio bloque beginText/endText, así (x, y) es siempre
-    // una posición absoluta en la página, sin arrastrar la posición anterior.
     static void escribirLinea(PDPageContentStream contenido, String texto,
                               float x, float y, float tamaño) throws IOException {
+        String textoSeguro = texto.replace("⚠", "[AVISO]");
         contenido.beginText();
         contenido.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), tamaño);
         contenido.newLineAtOffset(x, y);
-        contenido.showText(texto);
+        contenido.showText(textoSeguro);
         contenido.endText();
     }
 
-    // soloTratamientosActuales: si es true, no se incluyen en el PDF los
-    // tratamientos cuya fechaFin ya haya pasado (ver GestorMascotas.obtenerLineasTratamientos)
-    static void exportarFicha(String microchip, boolean soloTratamientosActuales) {
+    // CAMBIO: Ahora recibe 'int idMascota' en lugar de 'String microchip'
+    static void exportarFicha(int idMascota, boolean soloTratamientosActuales) {
 
-        String[] datos = GestorMascotas.obtenerDatosBasicos(microchip);
+        // Consultamos los datos por ID
+        String[] datos = GestorMascotas.obtenerDatosBasicos(idMascota);
         if (datos == null) {
-            System.out.println("No se encontró ninguna mascota con ese microchip.");
+            System.out.println("No se encontró ninguna mascota con ese ID.");
             return;
         }
 
@@ -49,39 +48,39 @@ public class ExportadorMascota {
                 y -= 15;
                 escribirLinea(contenido, "Sexo: " + datos[4] + "   |   Color: " + datos[5], margen, y, 11);
                 y -= 15;
-                escribirLinea(contenido, "Microchip: " + datos[6], margen, y, 11);
+
+                // Si el microchip no se rellenó o viene vacío, lo gestionamos limpiamente
+                String chipTexto = (datos[6] == null || datos[6].trim().isEmpty()) ? "Sin microchip" : datos[6];
+                escribirLinea(contenido, "Microchip: " + chipTexto, margen, y, 11);
                 y -= 30;
 
                 // --- Vacunas: siempre todas ---
-                y = escribirSeccion(contenido, "Vacunas", GestorMascotas.obtenerLineasVacunas(microchip), margen, y);
+                y = escribirSeccion(contenido, "Vacunas", GestorMascotas.obtenerLineasVacunas(idMascota), margen, y);
 
                 // --- Revisiones: siempre todas ---
-                y = escribirSeccion(contenido, "Revisiones", GestorMascotas.obtenerLineasRevisiones(microchip), margen, y);
+                y = escribirSeccion(contenido, "Revisiones", GestorMascotas.obtenerLineasRevisiones(idMascota), margen, y);
 
                 // --- Tratamientos: filtrados según el parámetro ---
                 String tituloTratamientos = soloTratamientosActuales ? "Tratamientos actuales" : "Tratamientos (todos)";
-                ArrayList<String> tratamientos = GestorMascotas.obtenerLineasTratamientos(microchip, soloTratamientosActuales);
+                ArrayList<String> tratamientos = GestorMascotas.obtenerLineasTratamientos(idMascota, soloTratamientosActuales);
                 y = escribirSeccion(contenido, tituloTratamientos, tratamientos, margen, y);
 
                 // --- Historial de peso: siempre todo ---
-                escribirSeccion(contenido, "Historial de peso", GestorMascotas.obtenerLineasPesos(microchip), margen, y);
+                escribirSeccion(contenido, "Historial de peso", GestorMascotas.obtenerLineasPesos(idMascota), margen, y);
             }
 
-            String nombreArchivo = datos[0] + "_ficha.pdf";
+            // Sanitizamos el nombre para que no dé problemas al crear el nombre del archivo
+            String safeName = (datos[0] == null) ? "mascota" : datos[0].replaceAll("[^a-zA-Z0-9-_.]", "_");
+            if (safeName.length() > 50) safeName = safeName.substring(0, 50);
+            String nombreArchivo = safeName + "_ficha.pdf";
             documento.save(nombreArchivo);
-            System.out.println("PDF generado correctamente: " + nombreArchivo);
+            AppLogger.logInfo("PDF generado correctamente: " + nombreArchivo);
 
         } catch (IOException e) {
-            System.out.println("Error al generar el PDF: " + e.getMessage());
+            AppLogger.logSevere("Error al generar el PDF: " + e.getMessage());
         }
     }
 
-    // Escribe un título de sección y su lista de líneas, y devuelve la nueva
-    // posición "y" (más abajo), para que el siguiente bloque sepa dónde seguir.
-    // Nota: por simplicidad, esta primera versión asume que todo cabe en una
-    // sola página. Si una mascota tuviera muchísimos registros, el texto
-    // podría salirse de la página — eso se resolvería más adelante añadiendo
-    // una segunda página cuando "y" baje demasiado.
     static float escribirSeccion(PDPageContentStream contenido, String titulo,
                                  ArrayList<String> lineas, float margen, float y) throws IOException {
 
