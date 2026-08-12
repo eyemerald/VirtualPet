@@ -1,18 +1,21 @@
 import javafx.geometry.Insets;
-import javafx.scene.Scene;
+import javafx.scene.Node;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
+import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
-import javafx.stage.Modality;
-import javafx.stage.Stage;
+import org.kordamp.ikonli.feather.Feather;
+import org.kordamp.ikonli.javafx.FontIcon;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -20,23 +23,35 @@ import java.util.Optional;
 
 public class GestionRevisionesVentana {
 
-    static void abrir(int idMascota, Runnable alGuardar) {
+    public static void abrir(int idMascota, Runnable alGuardar) {
+        Navegador.navegarA("Gestionar revisiones", () -> crearVista(idMascota, alGuardar));
+    }
 
+    public static Node crearVista(int idMascota, Runnable alGuardar) {
         ArrayList<String[]> revisiones = GestorMascotas.obtenerRevisionesConId(idMascota);
 
-        if (revisiones.isEmpty()) {
-            Alert aviso = new Alert(Alert.AlertType.INFORMATION, "Esta mascota no tiene revisiones registradas.");
-            aviso.showAndWait();
-            return;
-        }
+        Button botonAñadirNuevo = new Button("+ Añadir nuevo");
+        FontIcon iconoAñadir = new FontIcon(Feather.PLUS_CIRCLE);
+        iconoAñadir.setIconSize(16);
+        botonAñadirNuevo.setGraphic(iconoAñadir);
+        botonAñadirNuevo.getStyleClass().add("btn-primary");
+        botonAñadirNuevo.setOnAction(e -> FormularioRegistro.abrirRevision(idMascota, alGuardar));
 
-        Stage ventana = new Stage();
-        ventana.setTitle("Gestionar revisiones");
-        ventana.initModality(Modality.APPLICATION_MODAL);
+        if (revisiones.isEmpty()) {
+            VBox vacio = new VBox(14,
+                    new Label("Esta mascota no tiene revisiones registradas."),
+                    botonAñadirNuevo
+            );
+            vacio.setPadding(new Insets(15));
+            ScrollPane scrollVacio = new ScrollPane(vacio);
+            scrollVacio.setFitToWidth(true);
+            scrollVacio.setFitToHeight(true);
+            scrollVacio.setStyle("-fx-background-color: transparent; -fx-background: transparent;");
+            return scrollVacio;
+        }
 
         ListView<String> lista = new ListView<>();
         for (String[] r : revisiones) {
-            // r = [id, fechaRevision, motivoRevision, diagnostico, notas, veterinario]
             lista.getItems().add(r[1] + " - " + r[2]);
         }
 
@@ -51,9 +66,16 @@ public class GestionRevisionesVentana {
         TextField campoVeterinario = new TextField();
 
         Button botonGuardar = new Button("Guardar cambios");
+        FontIcon iconoGuardar = new FontIcon(Feather.CHECK);
+        iconoGuardar.setIconSize(16);
+        botonGuardar.setGraphic(iconoGuardar);
         botonGuardar.setDisable(true);
 
         Button botonBorrar = new Button("Borrar revisión");
+        FontIcon iconoBorrar = new FontIcon(Feather.TRASH_2);
+        iconoBorrar.setIconSize(16);
+        botonBorrar.setGraphic(iconoBorrar);
+        botonBorrar.getStyleClass().add("btn-danger");
         botonBorrar.setDisable(true);
 
         lista.getSelectionModel().selectedItemProperty().addListener((observable, valorAntiguo, valorNuevo) -> {
@@ -89,8 +111,8 @@ public class GestionRevisionesVentana {
                             campoMotivo.getText(), campoDiagnostico.getText(),
                             campoNotas.getText(), campoVeterinario.getText());
                     javafx.application.Platform.runLater(() -> {
-                        alGuardar.run();
-                        ventana.close();
+                        if (alGuardar != null) alGuardar.run();
+                        Navegador.volverAtras();
                     });
                 } catch (Exception e) {
                     javafx.application.Platform.runLater(() -> mostrarAviso("Error al actualizar: " + e.getMessage()));
@@ -115,8 +137,8 @@ public class GestionRevisionesVentana {
                     try {
                         GestorMascotas.borrarRevision(idRevision);
                         javafx.application.Platform.runLater(() -> {
-                            alGuardar.run();
-                            ventana.close();
+                            if (alGuardar != null) alGuardar.run();
+                            Navegador.volverAtras();
                         });
                     } catch (Exception e) {
                         javafx.application.Platform.runLater(() -> mostrarAviso("Error al borrar: " + e.getMessage()));
@@ -142,18 +164,30 @@ public class GestionRevisionesVentana {
 
         HBox botones = new HBox(10, botonGuardar, botonBorrar);
 
-        VBox contenido = new VBox(10,
-                new Label("Selecciona la revisión a modificar:"),
-                lista,
+        BorderPane layout = new BorderPane();
+        layout.setPadding(new Insets(15));
+
+        Label tituloInstruccion = new Label("Selecciona la revisión a modificar:");
+        tituloInstruccion.setPadding(new Insets(0, 0, 6, 0));
+        layout.setTop(tituloInstruccion);
+
+        VBox.setVgrow(lista, Priority.ALWAYS);
+        layout.setCenter(lista);
+
+        VBox seccionBottom = new VBox(10,
                 new Label("Edita los datos y guarda:"),
                 camposEdicion,
-                botones
+                botones,
+                botonAñadirNuevo
         );
-        contenido.setPadding(new Insets(15));
+        seccionBottom.setPadding(new Insets(10, 0, 0, 0));
+        layout.setBottom(seccionBottom);
 
-        Scene escena = new Scene(contenido, 480, 640);
-        ventana.setScene(escena);
-        ventana.showAndWait();
+        ScrollPane scroll = new ScrollPane(layout);
+        scroll.setFitToWidth(true);
+        scroll.setFitToHeight(true);
+        scroll.setStyle("-fx-background-color: transparent; -fx-background: transparent;");
+        return scroll;
     }
 
     private static void mostrarAviso(String mensaje) {

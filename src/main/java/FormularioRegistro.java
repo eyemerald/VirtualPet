@@ -1,34 +1,32 @@
 import javafx.geometry.Insets;
-import javafx.scene.Scene;
+import javafx.scene.Node;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.GridPane;
-import javafx.stage.Modality;
-import javafx.stage.Stage;
+import org.kordamp.ikonli.feather.Feather;
+import org.kordamp.ikonli.javafx.FontIcon;
 
 public class FormularioRegistro {
 
-    // Cada método recibe idMascota (a quién se le añade el dato) y
-    // alGuardar: un Runnable, que es "una tarea sin argumentos ni resultado
-    // que se puede guardar en una variable y ejecutar más tarde con .run()".
-    // Lo usamos para que, después de guardar, la ficha que abrió este
-    // formulario sepa que tiene que refrescar su historial — sin esto,
-    // FormularioRegistro no tendría forma de "avisar" a quien lo abrió.
+    public static void abrirVacuna(int idMascota, Runnable alGuardar) {
+        Navegador.navegarA("Añadir vacuna", () -> crearVistaVacuna(idMascota, alGuardar));
+    }
 
-    static void abrirVacuna(int idMascota, Runnable alGuardar) {
-        Stage ventana = new Stage();
-        ventana.setTitle("Añadir vacuna");
-        ventana.initModality(Modality.APPLICATION_MODAL);
-
+    public static Node crearVistaVacuna(int idMascota, Runnable alGuardar) {
         TextField campoNombre = new TextField();
         DatePicker campoFechaAplicacion = new DatePicker();
         DatePicker campoFechaProxima = new DatePicker();
         TextField campoVeterinario = new TextField();
         TextField campoLote = new TextField();
         Button botonGuardar = new Button("Guardar");
+        FontIcon iconoGuardar = new FontIcon(Feather.CHECK);
+        iconoGuardar.setIconSize(16);
+        botonGuardar.setGraphic(iconoGuardar);
+        botonGuardar.getStyleClass().add("btn-primary");
 
         GridPane grid = crearGridBase();
         grid.add(new Label("Nombre:"), 0, 0);
@@ -57,8 +55,8 @@ public class FormularioRegistro {
                 try {
                     GestorMascotas.guardarVacuna(idMascota, v);
                     javafx.application.Platform.runLater(() -> {
-                        alGuardar.run(); // avisa a quien nos abrió de que ya hay datos nuevos
-                        ventana.close();
+                        if (alGuardar != null) alGuardar.run();
+                        Navegador.volverAtras();
                     });
                 } catch (Exception e) {
                     javafx.application.Platform.runLater(() -> mostrarError("Error al guardar: " + e.getMessage()));
@@ -67,20 +65,24 @@ public class FormularioRegistro {
             }, "guardar-vacuna-thread").start();
         });
 
-        mostrarVentana(ventana, grid, "Añadir vacuna");
+        return crearScroll(grid);
     }
 
-    static void abrirRevision(int idMascota, Runnable alGuardar) {
-        Stage ventana = new Stage();
-        ventana.setTitle("Añadir revisión");
-        ventana.initModality(Modality.APPLICATION_MODAL);
+    public static void abrirRevision(int idMascota, Runnable alGuardar) {
+        Navegador.navegarA("Añadir revisión", () -> crearVistaRevision(idMascota, alGuardar));
+    }
 
+    public static Node crearVistaRevision(int idMascota, Runnable alGuardar) {
         DatePicker campoFecha = new DatePicker();
         TextField campoMotivo = new TextField();
         TextField campoDiagnostico = new TextField();
         TextField campoNotas = new TextField();
         TextField campoVeterinario = new TextField();
         Button botonGuardar = new Button("Guardar");
+        FontIcon iconoGuardar = new FontIcon(Feather.CHECK);
+        iconoGuardar.setIconSize(16);
+        botonGuardar.setGraphic(iconoGuardar);
+        botonGuardar.getStyleClass().add("btn-primary");
 
         GridPane grid = crearGridBase();
         grid.add(new Label("Fecha:"), 0, 0);
@@ -108,8 +110,8 @@ public class FormularioRegistro {
                 try {
                     GestorMascotas.guardarRevision(idMascota, r);
                     javafx.application.Platform.runLater(() -> {
-                        alGuardar.run();
-                        ventana.close();
+                        if (alGuardar != null) alGuardar.run();
+                        Navegador.volverAtras();
                     });
                 } catch (Exception e) {
                     javafx.application.Platform.runLater(() -> mostrarError("Error al guardar: " + e.getMessage()));
@@ -118,14 +120,14 @@ public class FormularioRegistro {
             }, "guardar-revision-thread").start();
         });
 
-        mostrarVentana(ventana, grid, "Añadir revisión");
+        return crearScroll(grid);
     }
 
-    static void abrirTratamiento(int idMascota, Runnable alGuardar) {
-        Stage ventana = new Stage();
-        ventana.setTitle("Añadir tratamiento");
-        ventana.initModality(Modality.APPLICATION_MODAL);
+    public static void abrirTratamiento(int idMascota, Runnable alGuardar) {
+        Navegador.navegarA("Añadir tratamiento", () -> crearVistaTratamiento(idMascota, alGuardar));
+    }
 
+    public static Node crearVistaTratamiento(int idMascota, Runnable alGuardar) {
         TextField campoMedicamento = new TextField();
         TextField campoDosis = new TextField();
         TextField campoFrecuencia = new TextField();
@@ -134,6 +136,10 @@ public class FormularioRegistro {
         Label avisoFin = new Label("Déjalo vacío si es un tratamiento crónico/indefinido");
         avisoFin.setStyle("-fx-font-size: 10px; -fx-text-fill: gray;");
         Button botonGuardar = new Button("Guardar");
+        FontIcon iconoGuardar = new FontIcon(Feather.CHECK);
+        iconoGuardar.setIconSize(16);
+        botonGuardar.setGraphic(iconoGuardar);
+        botonGuardar.getStyleClass().add("btn-primary");
 
         GridPane grid = crearGridBase();
         grid.add(new Label("Medicamento:"), 0, 0);
@@ -154,15 +160,11 @@ public class FormularioRegistro {
                 mostrarError("Medicamento y fecha de inicio son obligatorios.");
                 return;
             }
-            // NUEVO: si hay fecha fin, no puede ser anterior a la de inicio
             if (campoFin.getValue() != null && campoFin.getValue().isBefore(campoInicio.getValue())) {
                 mostrarError("La fecha fin no puede ser anterior a la fecha de inicio.");
                 return;
             }
 
-            // campoFin.getValue() puede ser null si lo dejaron vacío — eso
-            // está bien, el constructor de Tratamiento y la base de datos
-            // ya saben tratar un fechaFin nulo como "crónico"
             Tratamiento t = new Tratamiento(campoMedicamento.getText(), campoDosis.getText(),
                     campoFrecuencia.getText(), campoInicio.getValue(), campoFin.getValue());
             botonGuardar.setDisable(true);
@@ -170,8 +172,8 @@ public class FormularioRegistro {
                 try {
                     GestorMascotas.guardarTratamiento(idMascota, t);
                     javafx.application.Platform.runLater(() -> {
-                        alGuardar.run();
-                        ventana.close();
+                        if (alGuardar != null) alGuardar.run();
+                        Navegador.volverAtras();
                     });
                 } catch (Exception e) {
                     javafx.application.Platform.runLater(() -> mostrarError("Error al guardar: " + e.getMessage()));
@@ -180,19 +182,23 @@ public class FormularioRegistro {
             }, "guardar-tratamiento-thread").start();
         });
 
-        mostrarVentana(ventana, grid, "Añadir tratamiento");
+        return crearScroll(grid);
     }
 
-    static void abrirPeso(int idMascota, Runnable alGuardar) {
-        Stage ventana = new Stage();
-        ventana.setTitle("Añadir registro de peso");
-        ventana.initModality(Modality.APPLICATION_MODAL);
+    public static void abrirPeso(int idMascota, Runnable alGuardar) {
+        Navegador.navegarA("Añadir registro de peso", () -> crearVistaPeso(idMascota, alGuardar));
+    }
 
+    public static Node crearVistaPeso(int idMascota, Runnable alGuardar) {
         DatePicker campoFecha = new DatePicker();
         TextField campoPeso = new TextField();
         campoPeso.setPromptText("Ejemplo: 11.8");
         TextField campoNotas = new TextField();
         Button botonGuardar = new Button("Guardar");
+        FontIcon iconoGuardar = new FontIcon(Feather.CHECK);
+        iconoGuardar.setIconSize(16);
+        botonGuardar.setGraphic(iconoGuardar);
+        botonGuardar.getStyleClass().add("btn-primary");
 
         GridPane grid = crearGridBase();
         grid.add(new Label("Fecha:"), 0, 0);
@@ -211,7 +217,7 @@ public class FormularioRegistro {
 
             double peso;
             try {
-                peso = Double.parseDouble(campoPeso.getText().replace(",", ".")); // por si alguien escribe coma decimal
+                peso = Double.parseDouble(campoPeso.getText().replace(",", "."));
             } catch (NumberFormatException e) {
                 mostrarError("El peso debe ser un número, ejemplo: 11.8");
                 return;
@@ -223,8 +229,8 @@ public class FormularioRegistro {
                 try {
                     GestorMascotas.guardarPeso(idMascota, p);
                     javafx.application.Platform.runLater(() -> {
-                        alGuardar.run();
-                        ventana.close();
+                        if (alGuardar != null) alGuardar.run();
+                        Navegador.volverAtras();
                     });
                 } catch (Exception e) {
                     javafx.application.Platform.runLater(() -> mostrarError("Error al guardar: " + e.getMessage()));
@@ -233,11 +239,8 @@ public class FormularioRegistro {
             }, "guardar-peso-thread").start();
         });
 
-        mostrarVentana(ventana, grid, "Añadir peso");
+        return crearScroll(grid);
     }
-
-    // ================== AYUDANTES PRIVADOS ==================
-    // Para no repetir la misma configuración de GridPane y Scene 4 veces
 
     private static GridPane crearGridBase() {
         GridPane grid = new GridPane();
@@ -247,10 +250,11 @@ public class FormularioRegistro {
         return grid;
     }
 
-    private static void mostrarVentana(Stage ventana, GridPane grid, String titulo) {
-        Scene escena = new Scene(grid, 320, 260);
-        ventana.setScene(escena);
-        ventana.showAndWait();
+    private static ScrollPane crearScroll(GridPane grid) {
+        ScrollPane scroll = new ScrollPane(grid);
+        scroll.setFitToWidth(true);
+        scroll.setStyle("-fx-background-color: transparent; -fx-background: transparent;");
+        return scroll;
     }
 
     private static void mostrarError(String mensaje) {

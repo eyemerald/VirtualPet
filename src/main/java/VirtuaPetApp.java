@@ -1,82 +1,122 @@
+import atlantafx.base.theme.PrimerLight;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
-import javafx.scene.control.ListView;
+import javafx.scene.control.Label;
+import javafx.scene.control.ScrollPane;
+import javafx.scene.input.MouseButton;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.FlowPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.VBox;
+import javafx.stage.Screen;
 import javafx.stage.Stage;
+import org.kordamp.ikonli.feather.Feather;
+import org.kordamp.ikonli.javafx.FontIcon;
 
+import java.net.URL;
 import java.util.ArrayList;
 
 public class VirtuaPetApp extends Application {
 
-    // ListView<String> es un componente de JavaFX que muestra una lista
-    // vertical de elementos de texto. La declaramos aquí, como atributo
-    // de la clase (no dentro de un método), para que tanto start() como
-    // el método que refresca la lista puedan acceder a ella.
-    static ListView<String> listaMascotas = new ListView<>();
-
-    // NUEVO: guarda los ids reales, en el mismo orden que se muestran en
-    // la lista visual. Igual que hacíamos en consola con la lista de
-    // microchips/ids para poder elegir por número, aquí lo necesitamos
-    // para saber a qué mascota corresponde la fila en la que hicen doble clic.
+    static FlowPane contenedorMascotas = new FlowPane();
     static ArrayList<Integer> idsMascotas = new ArrayList<>();
 
     @Override
     public void start(Stage escenario) {
 
-        CrearTablas.crearTablas(); // igual que en el Main de consola: asegura las tablas
+        Application.setUserAgentStylesheet(new PrimerLight().getUserAgentStylesheet());
 
-        Button botonAñadir = new Button("+ Añadir mascota");
-        botonAñadir.setOnAction(evento -> abrirFormularioNuevaMascota());
+        CrearTablas.crearTablas();
 
-        // BorderPane organiza la pantalla en 5 zonas: arriba, abajo,
-        // izquierda, derecha y centro. Aquí solo usamos "top" (el botón)
-        // y "center" (la lista), el resto quedan vacías por ahora.
+        Button botonAtras = new Button();
+        FontIcon iconoAtras = new FontIcon(Feather.ARROW_LEFT);
+        iconoAtras.setIconSize(18);
+        botonAtras.setGraphic(iconoAtras);
+        botonAtras.setStyle("-fx-background-color: transparent; -fx-cursor: hand; -fx-padding: 4 8 4 8;");
+        botonAtras.setOnAction(evento -> Navegador.volverAtras());
+
+        Label tituloVentana = new Label("VirtuaPet");
+        tituloVentana.setStyle("-fx-font-size: 18px; -fx-font-weight: bold;");
+
+        HBox topBar = new HBox(10, botonAtras, tituloVentana);
+        topBar.setAlignment(Pos.CENTER_LEFT);
+        topBar.setPadding(new Insets(10, 14, 10, 14));
+        topBar.setStyle("-fx-background-color: #FFFFFF; -fx-border-color: #E0E0E0; -fx-border-width: 0 0 1 0;");
+
         BorderPane raiz = new BorderPane();
-        raiz.setTop(botonAñadir);
-        raiz.setCenter(listaMascotas);
-        BorderPane.setMargin(botonAñadir, new Insets(10)); // un poco de aire alrededor del botón
+        raiz.setTop(topBar);
 
-        cargarListaMascotas(); // rellena la lista con lo que ya haya en la base de datos
+        Navegador.inicializar(escenario, raiz, botonAtras, tituloVentana);
+        Navegador.navegarA("VirtuaPet", VirtuaPetApp::crearVistaInicio);
 
-        // NUEVO: al hacer doble clic en un elemento de la lista, se abre
-        // su ficha completa. getClickCount() == 2 distingue un doble clic
-        // de un simple clic (que solo selecciona, sin abrir nada).
-        listaMascotas.setOnMouseClicked(evento -> {
-            if (evento.getClickCount() == 2) {
-                int indiceSeleccionado = listaMascotas.getSelectionModel().getSelectedIndex();
-                if (indiceSeleccionado >= 0) { // -1 significa "nada seleccionado"
-                    int idMascota = idsMascotas.get(indiceSeleccionado);
-                    FichaMascotaVentana.abrir(idMascota);
-                }
-            }
-        });
+        // Limitamos el tamaño al espacio real disponible en la pantalla
+        // (dejando margen para la barra de tareas), en vez de forzar
+        // siempre 680x680 aunque la pantalla sea más pequeña.
+        double anchoDisponible = Screen.getPrimary().getVisualBounds().getWidth() - 100;
+        double altoDisponible = Screen.getPrimary().getVisualBounds().getHeight() - 100;
+        double ancho = Math.min(680, anchoDisponible);
+        double alto = Math.min(680, altoDisponible);
 
-        Scene escena = new Scene(raiz, 400, 500);
+        Scene escena = new Scene(raiz, ancho, alto);
+        
+        URL cssUrl = VirtuaPetApp.class.getResource("/styles.css");
+        if (cssUrl != null) {
+            escena.getStylesheets().add(cssUrl.toExternalForm());
+        }
+
         escenario.setTitle("VirtuaPet");
         escenario.setScene(escena);
+        escenario.centerOnScreen();
         escenario.show();
     }
 
-    // Vacía la lista visual y la vuelve a rellenar leyendo la base de datos.
-    // La llamamos al arrancar, y también cada vez que se guarda una mascota
-    // nueva, para que la ventana principal se actualice sola.
+    public static Node crearVistaInicio() {
+        Button botonAñadir = new Button("+ Añadir mascota");
+        FontIcon iconoAñadir = new FontIcon(Feather.PLUS_CIRCLE);
+        iconoAñadir.setIconSize(16);
+        botonAñadir.setGraphic(iconoAñadir);
+        botonAñadir.getStyleClass().add("btn-primary");
+        botonAñadir.setOnAction(evento -> abrirFormularioNuevaMascota());
+
+        contenedorMascotas.setHgap(12);
+        contenedorMascotas.setVgap(12);
+        contenedorMascotas.setPadding(new Insets(12));
+        contenedorMascotas.setStyle("-fx-background-color: #F5F5F5;");
+
+        VBox contenido = new VBox(12, botonAñadir, contenedorMascotas);
+        contenido.setPadding(new Insets(12));
+        contenido.setStyle("-fx-background-color: #F5F5F5;");
+
+        cargarListaMascotas();
+
+        ScrollPane scroll = new ScrollPane(contenido);
+        scroll.setFitToWidth(true);
+        scroll.setStyle("-fx-background-color: transparent; -fx-background: transparent;");
+        return scroll;
+    }
+
     static void cargarListaMascotas() {
-        listaMascotas.getItems().clear();
+        contenedorMascotas.getChildren().clear();
         idsMascotas.clear();
 
-        // Ejecutar en background para no bloquear la UI
         new Thread(() -> {
             try {
                 ArrayList<String[]> mascotas = GestorMascotas.obtenerListaMascotas();
                 Platform.runLater(() -> {
-                    listaMascotas.getItems().clear();
+                    contenedorMascotas.getChildren().clear();
                     idsMascotas.clear();
                     for (String[] datos : mascotas) {
-                        listaMascotas.getItems().add(datos[1] + "  (" + datos[2] + ")");
-                        idsMascotas.add(Integer.parseInt(datos[0]));
+                        int idMascota = Integer.parseInt(datos[0]);
+                        String nombre = datos[1];
+                        
+                        VBox tarjeta = crearTarjetaMascota(nombre, idMascota);
+                        contenedorMascotas.getChildren().add(tarjeta);
+                        idsMascotas.add(idMascota);
                     }
                 });
             } catch (Exception e) {
@@ -84,6 +124,34 @@ public class VirtuaPetApp extends Application {
                 Platform.runLater(() -> System.err.println("Error al cargar mascotas: " + e.getMessage()));
             }
         }, "cargar-lista-thread").start();
+    }
+
+    private static VBox crearTarjetaMascota(String nombre, int idMascota) {
+        Label avatar = new Label(nombre.isEmpty() ? "?" : nombre.substring(0, 1).toUpperCase());
+        avatar.getStyleClass().add("avatar-circle");
+        avatar.setAlignment(Pos.CENTER);
+
+        Label nombreLabel = new Label(nombre);
+        nombreLabel.getStyleClass().add("pet-card-name");
+        nombreLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 13px; -fx-text-alignment: center;");
+        nombreLabel.setMaxWidth(80);
+        nombreLabel.setWrapText(true);
+
+        VBox tarjeta = new VBox(8, avatar, nombreLabel);
+        tarjeta.getStyleClass().add("card");
+        tarjeta.getStyleClass().add("clickable-card");
+        tarjeta.setAlignment(Pos.CENTER);
+        tarjeta.setPadding(new Insets(12));
+        tarjeta.setPrefWidth(110);
+        tarjeta.setMinHeight(120);
+
+        tarjeta.setOnMouseClicked(evento -> {
+            if (evento.getButton() == MouseButton.PRIMARY && evento.getClickCount() == 1) {
+                FichaMascotaVentana.abrir(idMascota);
+            }
+        });
+
+        return tarjeta;
     }
 
     static void abrirFormularioNuevaMascota() {

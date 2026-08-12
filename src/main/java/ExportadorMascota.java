@@ -6,6 +6,10 @@ import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.nio.file.Path;
+import java.nio.file.Files;
+import java.time.format.DateTimeFormatter;
+import java.time.LocalDateTime;
 
 public class ExportadorMascota {
 
@@ -69,12 +73,32 @@ public class ExportadorMascota {
                 escribirSeccion(contenido, "Historial de peso", GestorMascotas.obtenerLineasPesos(idMascota), margen, y);
             }
 
-            // Sanitizamos el nombre para que no dé problemas al crear el nombre del archivo
-            String safeName = (datos[0] == null) ? "mascota" : datos[0].replaceAll("[^a-zA-Z0-9-_.]", "_");
+            // Sanitizamos el nombre para usar en la carpeta y nombre de archivo
+            String nombreMascota = (datos[0] == null) ? "mascota" : datos[0];
+            String safeName = nombreMascota.replaceAll("[^a-zA-Z0-9-_.]", "_");
             if (safeName.length() > 50) safeName = safeName.substring(0, 50);
-            String nombreArchivo = safeName + "_ficha.pdf";
-            documento.save(nombreArchivo);
-            AppLogger.logInfo("PDF generado correctamente: " + nombreArchivo);
+
+            // Aseguramos carpeta de la mascota
+            try {
+                GestorArchivos.crearCarpetaMascota(idMascota, nombreMascota);
+            } catch (Exception e) {
+                AppLogger.logSevere("No se pudo crear la carpeta de la mascota: " + e.getMessage());
+            }
+
+            // Añadimos timestamp para evitar sobrescribir
+            DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd_HHmmss");
+            String timestamp = java.time.LocalDateTime.now().format(fmt);
+            String nombreArchivo = safeName + "_ficha_" + timestamp + ".pdf";
+
+            Path carpeta = Path.of("mascotas", idMascota + "_" + GestorArchivos.safeName(nombreMascota));
+            try {
+                if (!Files.exists(carpeta)) Files.createDirectories(carpeta);
+                Path destino = carpeta.resolve(nombreArchivo);
+                documento.save(destino.toString());
+                AppLogger.logInfo("PDF generado correctamente: " + destino.toString());
+            } catch (IOException e) {
+                AppLogger.logSevere("Error al guardar el PDF en la carpeta de la mascota: " + e.getMessage());
+            }
 
         } catch (IOException e) {
             AppLogger.logSevere("Error al generar el PDF: " + e.getMessage());

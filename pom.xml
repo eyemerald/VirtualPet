@@ -51,6 +51,26 @@
             <artifactId>javafx-graphics</artifactId>
             <version>${javafx.version}</version>
         </dependency>
+
+        <!-- AtlantaFX: tema visual moderno para JavaFX, aplicado globalmente
+             en VirtuaPetApp.start(). Ver https://github.com/mkpaz/atlantafx -->
+        <dependency>
+            <groupId>io.github.mkpaz</groupId>
+            <artifactId>atlantafx-base</artifactId>
+            <version>2.1.0</version>
+        </dependency>
+
+        <!-- Ikonli: librería de iconos FontAwesome/Feather para JavaFX -->
+        <dependency>
+            <groupId>org.kordamp.ikonli</groupId>
+            <artifactId>ikonli-javafx</artifactId>
+            <version>12.3.1</version>
+        </dependency>
+        <dependency>
+            <groupId>org.kordamp.ikonli</groupId>
+            <artifactId>ikonli-feather-pack</artifactId>
+            <version>12.3.1</version>
+        </dependency>
     </dependencies>
 
     <build>
@@ -72,7 +92,7 @@
                 <artifactId>javafx-maven-plugin</artifactId>
                 <version>${javafx.maven.plugin.version}</version>
                 <configuration>
-                    <mainClass>VirtuaPetApp</mainClass>
+                    <mainClass>Launcher</mainClass>
                 </configuration>
             </plugin>
 
@@ -89,7 +109,7 @@
                         <configuration>
                             <archive>
                                 <manifest>
-                                    <mainClass>VirtuaPetApp</mainClass>
+                                    <mainClass>Launcher</mainClass>
                                 </manifest>
                             </archive>
                             <descriptorRefs>

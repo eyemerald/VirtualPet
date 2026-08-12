@@ -7,13 +7,24 @@ import java.sql.Statement;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 public class GestorMascotas {
 
-    static final String URL = "jdbc:sqlite:virtuapet.db";
+    // La URL ya no es fija con ruta relativa: se calcula apuntando a la
+    // carpeta de usuario (ver RutasApp.java) — coherente con CrearTablas.
+    static String getUrl() {
+        return RutasApp.getUrlBaseDatos();
+    }
 
     static Connection abrirConexion() throws SQLException {
-        Connection conexion = DriverManager.getConnection(URL);
+        Connection conexion = DriverManager.getConnection(getUrl());
         try (Statement pragma = conexion.createStatement()) {
             pragma.execute("PRAGMA foreign_keys = ON");
         }
@@ -42,7 +53,7 @@ public class GestorMascotas {
             }
 
         } catch (SQLException e) {
-            System.out.println("Error al leer las mascotas: " + e.getMessage());
+            AppLogger.logSevere("Error al leer las mascotas: " + e.getMessage());
         }
 
         return lista;
@@ -67,7 +78,7 @@ public class GestorMascotas {
             }
 
         } catch (SQLException e) {
-            System.out.println("Error al leer las mascotas: " + e.getMessage());
+            AppLogger.logSevere("Error al leer las mascotas: " + e.getMessage());
         }
 
         return ids;
@@ -75,12 +86,27 @@ public class GestorMascotas {
 
     // ================== GUARDAR ==================
 
-    static int guardarMascota(Mascota m) {
+    static int guardarMascota(Mascota m) throws Exception {
+        // Comprobación de nombre único (case-insensitive)
+        String sqlCheck = "SELECT id FROM mascotas WHERE LOWER(nombre) = LOWER(?)";
+        try (Connection conexion = abrirConexion();
+             PreparedStatement chk = conexion.prepareStatement(sqlCheck)) {
+            chk.setString(1, m.getNombre());
+            try (ResultSet rs = chk.executeQuery()) {
+                if (rs.next()) {
+                    throw new Exception("Ya existe una mascota con ese nombre");
+                }
+            }
+        } catch (SQLException e) {
+            AppLogger.logSevere("Error comprobando nombre: " + e.getMessage());
+            throw new Exception("Error comprobando nombre: " + e.getMessage());
+        }
+
         String sql = "INSERT INTO mascotas (nombre, especie, raza, fechaNacimiento, sexo, color, microchip) "
                 + "VALUES (?, ?, ?, ?, ?, ?, ?)";
 
         try (Connection conexion = abrirConexion();
-             PreparedStatement sentencia = conexion.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+             PreparedStatement sentencia = conexion.prepareStatement(sql)) {
 
             sentencia.setString(1, m.getNombre());
             sentencia.setString(2, m.getEspecie());
@@ -92,16 +118,25 @@ public class GestorMascotas {
 
             sentencia.executeUpdate();
 
-            try (ResultSet claveGenerada = sentencia.getGeneratedKeys()) {
-                if (claveGenerada.next()) {
-                    int idNuevo = claveGenerada.getInt(1);
-                    System.out.println("Mascota guardada: " + m.getNombre() + " (id " + idNuevo + ")");
+            // Obtener id generado con last_insert_rowid() (compatible con SQLite JDBC)
+            try (Statement s2 = conexion.createStatement();
+                 ResultSet rs = s2.executeQuery("SELECT last_insert_rowid()")) {
+                if (rs.next()) {
+                    int idNuevo = rs.getInt(1);
+                    AppLogger.logInfo("Mascota guardada: " + m.getNombre() + " (id " + idNuevo + ")");
+                    // Crear carpeta física para esa mascota
+                    try {
+                        GestorArchivos.crearCarpetaMascota(idNuevo, m.getNombre());
+                    } catch (Exception ex) {
+                        AppLogger.logSevere("Aviso: no se pudo crear carpeta de la mascota: " + ex.getMessage());
+                    }
                     return idNuevo;
                 }
             }
 
         } catch (SQLException e) {
-            System.out.println("Error al guardar la mascota: " + e.getMessage());
+            AppLogger.logSevere("Error al guardar la mascota: " + e.getMessage());
+            throw new Exception("Error al guardar la mascota: " + e.getMessage());
         }
 
         return -1;
@@ -122,10 +157,10 @@ public class GestorMascotas {
             sentencia.setString(6, v.getLote());
 
             sentencia.executeUpdate();
-            System.out.println("Vacuna guardada.");
+            AppLogger.logInfo("Vacuna guardada.");
 
         } catch (SQLException e) {
-            System.out.println("Error al guardar la vacuna: " + e.getMessage());
+            AppLogger.logSevere("Error al guardar la vacuna: " + e.getMessage());
         }
     }
 
@@ -144,10 +179,10 @@ public class GestorMascotas {
             sentencia.setString(6, r.getVeterinario());
 
             sentencia.executeUpdate();
-            System.out.println("Revisión guardada.");
+            AppLogger.logInfo("Revisión guardada.");
 
         } catch (SQLException e) {
-            System.out.println("Error al guardar la revisión: " + e.getMessage());
+            AppLogger.logSevere("Error al guardar la revisión: " + e.getMessage());
         }
     }
 
@@ -176,10 +211,10 @@ public class GestorMascotas {
             }
 
             sentencia.executeUpdate();
-            System.out.println("Tratamiento guardado.");
+            AppLogger.logInfo("Tratamiento guardado.");
 
         } catch (SQLException e) {
-            System.out.println("Error al guardar tratamiento: " + e.getMessage());
+            AppLogger.logSevere("Error al guardar tratamiento: " + e.getMessage());
         }
     }
 
@@ -195,21 +230,153 @@ public class GestorMascotas {
             sentencia.setString(4, p.getNotas());
 
             sentencia.executeUpdate();
-            System.out.println("Registro de peso guardado.");
+            AppLogger.logInfo("Registro de peso guardado.");
 
         } catch (SQLException e) {
-            System.out.println("Error al guardar el peso: " + e.getMessage());
+            AppLogger.logSevere("Error al guardar el peso: " + e.getMessage());
+        }
+    }
+
+    // ================== INFORMES (documentos adjuntos) ================
+
+    static void guardarInforme(int idMascota, String tipo, String descripcion, String fecha, File archivoOrigen) {
+        // Obtén nombre de la mascota para construir la ruta
+        String[] datos = obtenerDatosBasicos(idMascota);
+        if (datos == null) {
+            AppLogger.logSevere("No se encontró la mascota para guardar el informe.");
+            return;
+        }
+        String nombreMascota = datos[0];
+
+        try {
+            // Aseguramos que la carpeta exista
+            GestorArchivos.crearCarpetaMascota(idMascota, nombreMascota);
+
+            String safeNombreArchivo = archivoOrigen.getName().replaceAll("[^a-zA-Z0-9-_.]", "_");
+            if (safeNombreArchivo.length() > 100) safeNombreArchivo = safeNombreArchivo.substring(0, 100);
+
+            // Si existe, añadimos timestamp para evitar sobrescribir.
+            // La carpeta de mascotas ahora vive en la ruta fija de usuario
+            // (RutasApp), no en una ruta relativa al directorio de trabajo.
+            Path carpeta = RutasApp.getCarpetaMascotas().resolve(idMascota + "_" + GestorArchivos.safeName(nombreMascota));
+            if (!Files.exists(carpeta)) Files.createDirectories(carpeta);
+
+            String timestamp = DateTimeFormatter.ofPattern("yyyyMMddHHmmss").format(LocalDateTime.now());
+            String nombreDestino = timestamp + "_" + safeNombreArchivo;
+            Path destino = carpeta.resolve(nombreDestino);
+
+            Files.copy(archivoOrigen.toPath(), destino, StandardCopyOption.REPLACE_EXISTING);
+
+            // Guardar referencia en BD
+            String sql = "INSERT INTO informes (mascota_id, tipo, descripcion, fecha, nombreArchivo, rutaArchivo) "
+                    + "VALUES (?, ?, ?, ?, ?, ?)";
+            try (Connection conexion = abrirConexion();
+                 PreparedStatement ps = conexion.prepareStatement(sql)) {
+                ps.setInt(1, idMascota);
+                ps.setString(2, tipo);
+                ps.setString(3, descripcion);
+                ps.setString(4, fecha);
+                ps.setString(5, nombreDestino);
+                ps.setString(6, destino.toString());
+                ps.executeUpdate();
+            }
+
+            AppLogger.logInfo("Informe guardado: " + destino.toString());
+
+        } catch (IOException | SQLException e) {
+            AppLogger.logSevere("Error al guardar el informe: " + e.getMessage());
+        }
+    }
+
+    static ArrayList<String[]> obtenerInformesConId(int idMascota) {
+        ArrayList<String[]> lista = new ArrayList<>();
+        String sql = "SELECT id, tipo, descripcion, fecha, nombreArchivo, rutaArchivo FROM informes WHERE mascota_id = ?";
+
+        try (Connection conexion = abrirConexion();
+             PreparedStatement ps = conexion.prepareStatement(sql)) {
+            ps.setInt(1, idMascota);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    lista.add(new String[]{
+                            rs.getString("id"),
+                            rs.getString("tipo"),
+                            rs.getString("descripcion"),
+                            rs.getString("fecha"),
+                            rs.getString("nombreArchivo"),
+                            rs.getString("rutaArchivo")
+                    });
+                }
+            }
+        } catch (SQLException e) {
+            AppLogger.logSevere("Error al leer informes: " + e.getMessage());
+        }
+
+        return lista;
+    }
+
+    static void borrarInforme(int idInforme) {
+        String sqlSelect = "SELECT rutaArchivo FROM informes WHERE id = ?";
+        String sqlDelete = "DELETE FROM informes WHERE id = ?";
+
+        try (Connection conexion = abrirConexion();
+             PreparedStatement psSelect = conexion.prepareStatement(sqlSelect)) {
+            psSelect.setInt(1, idInforme);
+            try (ResultSet rs = psSelect.executeQuery()) {
+                if (rs.next()) {
+                    String ruta = rs.getString("rutaArchivo");
+                    // borrar fichero físico si existe
+                    if (ruta != null && !ruta.isEmpty()) {
+                        try {
+                            Path p = Path.of(ruta);
+                            if (Files.exists(p)) Files.delete(p);
+                        } catch (IOException ex) {
+                            AppLogger.logSevere("No se pudo borrar el archivo físico: " + ex.getMessage());
+                        }
+                    }
+                }
+            }
+
+            try (PreparedStatement psDelete = conexion.prepareStatement(sqlDelete)) {
+                psDelete.setInt(1, idInforme);
+                int filas = psDelete.executeUpdate();
+                if (filas > 0) AppLogger.logInfo("Informe borrado de la base de datos.");
+            }
+
+        } catch (SQLException e) {
+            AppLogger.logSevere("Error al borrar informe: " + e.getMessage());
         }
     }
 
     // ================== ACTUALIZAR ==================
 
-    static void actualizarMascota(int id, Mascota datosNuevos) {
+    static void actualizarMascota(int id, Mascota datosNuevos) throws Exception {
+        // Comprobación de nombre único (case-insensitive), permitiendo mantener el propio id
+        String sqlCheck = "SELECT id FROM mascotas WHERE LOWER(nombre) = LOWER(?)";
+        try (Connection conexion = abrirConexion();
+             PreparedStatement chk = conexion.prepareStatement(sqlCheck)) {
+            chk.setString(1, datosNuevos.getNombre());
+            try (ResultSet rs = chk.executeQuery()) {
+                if (rs.next()) {
+                    int idExistente = rs.getInt("id");
+                    if (idExistente != id) {
+                        throw new Exception("Ya existe una mascota con ese nombre");
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            AppLogger.logSevere("Error comprobando nombre: " + e.getMessage());
+            throw new Exception("Error comprobando nombre: " + e.getMessage());
+        }
+
         String sql = "UPDATE mascotas SET nombre = ?, especie = ?, raza = ?, "
                 + "fechaNacimiento = ?, sexo = ?, color = ?, microchip = ? WHERE id = ?";
 
         try (Connection conexion = abrirConexion();
              PreparedStatement sentencia = conexion.prepareStatement(sql)) {
+
+            // Obtener nombre antiguo para renombrar carpeta si hace falta
+            String[] datosAntiguos = obtenerDatosBasicos(id);
+            String nombreAntiguo = (datosAntiguos == null) ? null : datosAntiguos[0];
 
             sentencia.setString(1, datosNuevos.getNombre());
             sentencia.setString(2, datosNuevos.getEspecie());
@@ -222,13 +389,22 @@ public class GestorMascotas {
 
             int filasActualizadas = sentencia.executeUpdate();
             if (filasActualizadas > 0) {
-                System.out.println("Mascota actualizada correctamente.");
+                AppLogger.logInfo("Mascota actualizada correctamente.");
+                // Si cambió el nombre, renombrar carpeta
+                if (nombreAntiguo != null && !GestorArchivos.safeName(nombreAntiguo).equals(GestorArchivos.safeName(datosNuevos.getNombre()))) {
+                    try {
+                        GestorArchivos.renombrarCarpetaMascota(id, nombreAntiguo, datosNuevos.getNombre());
+                    } catch (Exception ex) {
+                        AppLogger.logSevere("Aviso: no se pudo renombrar la carpeta de la mascota: " + ex.getMessage());
+                    }
+                }
             } else {
-                System.out.println("No se encontró ninguna mascota con ese id.");
+                AppLogger.logSevere("No se encontró ninguna mascota con ese id.");
             }
 
         } catch (SQLException e) {
-            System.out.println("Error al actualizar la mascota: " + e.getMessage());
+            AppLogger.logSevere("Error al actualizar la mascota: " + e.getMessage());
+            throw new Exception("Error al actualizar la mascota: " + e.getMessage());
         }
     }
 
@@ -244,13 +420,13 @@ public class GestorMascotas {
             int filasBorradas = sentencia.executeUpdate();
 
             if (filasBorradas > 0) {
-                System.out.println("Mascota y todos sus datos asociados han sido borrados.");
+                AppLogger.logInfo("Mascota y todos sus datos asociados han sido borrados.");
             } else {
-                System.out.println("No se encontró ninguna mascota con ese id.");
+                AppLogger.logSevere("No se encontró ninguna mascota con ese id.");
             }
 
         } catch (SQLException e) {
-            System.out.println("Error al borrar la mascota: " + e.getMessage());
+            AppLogger.logSevere("Error al borrar la mascota: " + e.getMessage());
         }
     }
 
@@ -264,13 +440,13 @@ public class GestorMascotas {
             int filasBorradas = sentencia.executeUpdate();
 
             if (filasBorradas > 0) {
-                System.out.println("Vacuna borrada.");
+                AppLogger.logInfo("Vacuna borrada.");
             } else {
-                System.out.println("No se encontró ninguna vacuna con ese id.");
+                AppLogger.logSevere("No se encontró ninguna vacuna con ese id.");
             }
 
         } catch (SQLException e) {
-            System.out.println("Error al borrar la vacuna: " + e.getMessage());
+            AppLogger.logSevere("Error al borrar la vacuna: " + e.getMessage());
         }
     }
 
@@ -284,13 +460,13 @@ public class GestorMascotas {
             int filasBorradas = sentencia.executeUpdate();
 
             if (filasBorradas > 0) {
-                System.out.println("Revisión borrada.");
+                AppLogger.logInfo("Revisión borrada.");
             } else {
-                System.out.println("No se encontró ninguna revisión con ese id.");
+                AppLogger.logSevere("No se encontró ninguna revisión con ese id.");
             }
 
         } catch (SQLException e) {
-            System.out.println("Error al borrar la revisión: " + e.getMessage());
+            AppLogger.logSevere("Error al borrar la revisión: " + e.getMessage());
         }
     }
 
@@ -304,13 +480,13 @@ public class GestorMascotas {
             int filasBorradas = sentencia.executeUpdate();
 
             if (filasBorradas > 0) {
-                System.out.println("Registro de peso borrado.");
+                AppLogger.logInfo("Registro de peso borrado.");
             } else {
-                System.out.println("No se encontró ningún registro de peso con ese id.");
+                AppLogger.logSevere("No se encontró ningún registro de peso con ese id.");
             }
 
         } catch (SQLException e) {
-            System.out.println("Error al borrar el registro de peso: " + e.getMessage());
+            AppLogger.logSevere("Error al borrar el registro de peso: " + e.getMessage());
         }
     }
 
@@ -341,7 +517,7 @@ public class GestorMascotas {
             }
 
         } catch (SQLException e) {
-            System.out.println("Error al leer los datos de la mascota: " + e.getMessage());
+            AppLogger.logSevere("Error al leer los datos de la mascota: " + e.getMessage());
         }
 
         return null;
@@ -381,7 +557,7 @@ public class GestorMascotas {
             }
 
         } catch (SQLException e) {
-            System.out.println("Error al leer las vacunas: " + e.getMessage());
+            AppLogger.logSevere("Error al leer las vacunas: " + e.getMessage());
         }
 
         return lineas;
@@ -412,7 +588,7 @@ public class GestorMascotas {
             }
 
         } catch (SQLException e) {
-            System.out.println("Error al leer las revisiones: " + e.getMessage());
+            AppLogger.logSevere("Error al leer las revisiones: " + e.getMessage());
         }
 
         return lineas;
@@ -450,7 +626,7 @@ public class GestorMascotas {
             }
 
         } catch (SQLException e) {
-            System.out.println("Error al leer los tratamientos: " + e.getMessage());
+            AppLogger.logSevere("Error al leer los tratamientos: " + e.getMessage());
         }
 
         return lista;
@@ -482,7 +658,7 @@ public class GestorMascotas {
             }
 
         } catch (SQLException e) {
-            System.out.println("Error al leer las vacunas: " + e.getMessage());
+            AppLogger.logSevere("Error al leer las vacunas: " + e.getMessage());
         }
 
         return lista;
@@ -512,7 +688,7 @@ public class GestorMascotas {
             }
 
         } catch (SQLException e) {
-            System.out.println("Error al leer las revisiones: " + e.getMessage());
+            AppLogger.logSevere("Error al leer las revisiones: " + e.getMessage());
         }
 
         return lista;
@@ -539,7 +715,7 @@ public class GestorMascotas {
             }
 
         } catch (SQLException e) {
-            System.out.println("Error al leer los pesos: " + e.getMessage());
+            AppLogger.logSevere("Error al leer los pesos: " + e.getMessage());
         }
 
         return lista;
@@ -573,10 +749,10 @@ public class GestorMascotas {
             sentencia.setInt(6, idTratamiento);
 
             sentencia.executeUpdate();
-            System.out.println("Tratamiento actualizado.");
+            AppLogger.logInfo("Tratamiento actualizado.");
 
         } catch (SQLException e) {
-            System.out.println("Error al actualizar el tratamiento: " + e.getMessage());
+            AppLogger.logSevere("Error al actualizar el tratamiento: " + e.getMessage());
         }
     }
 
@@ -596,10 +772,10 @@ public class GestorMascotas {
             sentencia.setInt(6, idVacuna);
 
             sentencia.executeUpdate();
-            System.out.println("Vacuna actualizada.");
+            AppLogger.logInfo("Vacuna actualizada.");
 
         } catch (SQLException e) {
-            System.out.println("Error al actualizar la vacuna: " + e.getMessage());
+            AppLogger.logSevere("Error al actualizar la vacuna: " + e.getMessage());
         }
     }
 
@@ -619,10 +795,10 @@ public class GestorMascotas {
             sentencia.setInt(6, idRevision);
 
             sentencia.executeUpdate();
-            System.out.println("Revisión actualizada.");
+            AppLogger.logInfo("Revisión actualizada.");
 
         } catch (SQLException e) {
-            System.out.println("Error al actualizar la revisión: " + e.getMessage());
+            AppLogger.logSevere("Error al actualizar la revisión: " + e.getMessage());
         }
     }
 
@@ -638,10 +814,10 @@ public class GestorMascotas {
             sentencia.setInt(4, idPeso);
 
             sentencia.executeUpdate();
-            System.out.println("Registro de peso actualizado.");
+            AppLogger.logInfo("Registro de peso actualizado.");
 
         } catch (SQLException e) {
-            System.out.println("Error al actualizar el peso: " + e.getMessage());
+            AppLogger.logSevere("Error al actualizar el peso: " + e.getMessage());
         }
     }
 
@@ -659,10 +835,10 @@ public class GestorMascotas {
             sentencia.setInt(2, idTratamiento);
 
             sentencia.executeUpdate();
-            System.out.println("Fecha fin del tratamiento actualizada.");
+            AppLogger.logInfo("Fecha fin del tratamiento actualizada.");
 
         } catch (SQLException e) {
-            System.out.println("Error al actualizar el tratamiento: " + e.getMessage());
+            AppLogger.logSevere("Error al actualizar el tratamiento: " + e.getMessage());
         }
     }
 
@@ -695,7 +871,7 @@ public class GestorMascotas {
             }
 
         } catch (SQLException e) {
-            System.out.println("Error al obtener tratamientos: " + e.getMessage());
+            AppLogger.logSevere("Error al obtener tratamientos: " + e.getMessage());
         }
 
         return lista;
@@ -718,7 +894,7 @@ public class GestorMascotas {
             }
 
         } catch (SQLException e) {
-            System.out.println("Error al leer los pesos: " + e.getMessage());
+            AppLogger.logSevere("Error al leer los pesos: " + e.getMessage());
         }
 
         return lineas;
@@ -759,7 +935,7 @@ public class GestorMascotas {
             }
 
         } catch (SQLException e) {
-            System.out.println("Error al leer las mascotas: " + e.getMessage());
+            AppLogger.logSevere("Error al leer las mascotas: " + e.getMessage());
         }
     }
 

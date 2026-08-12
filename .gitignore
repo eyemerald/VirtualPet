@@ -42,3 +42,10 @@ target/
 ### VirtuaPet - IDE (config personal, no debe compartirse) ###
 .idea/
 *.iml
+
+### VirtuaPet - runtime y binarios generados ###
+runtime-reducido/
+instalador/
+
+### Continue (config local, no del proyecto) ###
+.continue/

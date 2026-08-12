@@ -1,43 +1,30 @@
 import javafx.geometry.Insets;
-import javafx.scene.Scene;
+import javafx.scene.Node;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.GridPane;
-import javafx.stage.Modality;
-import javafx.stage.Stage;
+import org.kordamp.ikonli.feather.Feather;
+import org.kordamp.ikonli.javafx.FontIcon;
 
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 
 public class FormularioMascota {
 
-    // Para AÑADIR una mascota nueva (como ya tenías)
-    static void abrir() {
-        construirVentana(null, null);
+    public static void abrir() {
+        Navegador.navegarA("Nueva mascota", () -> crearVista(null, null));
     }
 
-    // NUEVO: para EDITAR una mascota que ya existe. Recibe el id (para
-    // saber a quién actualizar) y sus datos actuales (para rellenar
-    // los campos, en vez de dejarlos vacíos).
-    static void abrirEdicion(int idExistente, String[] datosActuales) {
-        construirVentana(idExistente, datosActuales);
+    public static void abrirEdicion(int idExistente, String[] datosActuales) {
+        Navegador.navegarA("Editar mascota", () -> crearVista(idExistente, datosActuales));
     }
 
-    // Método privado compartido: construye la MISMA ventana tanto para
-    // crear como para editar. idExistente == null significa "es nueva".
-    // datosActuales viene en el mismo orden que obtenerDatosBasicos():
-    // [nombre, especie, raza, fechaNacimiento, sexo, color, microchip]
-    private static void construirVentana(Integer idExistente, String[] datosActuales) {
-
+    public static Node crearVista(Integer idExistente, String[] datosActuales) {
         boolean esEdicion = (idExistente != null);
-
-        Stage ventana = new Stage();
-        ventana.setTitle(esEdicion ? "Editar mascota" : "Nueva mascota");
-        ventana.initModality(Modality.APPLICATION_MODAL);
 
         TextField campoNombre = new TextField();
         TextField campoEspecie = new TextField();
@@ -51,19 +38,21 @@ public class FormularioMascota {
         TextField campoMicrochip = new TextField();
         campoMicrochip.setPromptText("Opcional");
 
-        // Si estamos editando, precargamos los campos con los datos actuales
-        if (esEdicion) {
+        if (esEdicion && datosActuales != null) {
             campoNombre.setText(datosActuales[0]);
             campoEspecie.setText(datosActuales[1]);
             campoRaza.setText(datosActuales[2]);
-            campoFecha.setValue(LocalDate.parse(datosActuales[3])); // viene en formato ISO (yyyy-MM-dd) de la base de datos
+            campoFecha.setValue(LocalDate.parse(datosActuales[3]));
             campoSexo.setValue(datosActuales[4]);
             campoColor.setText(datosActuales[5]);
-            // Si no tenía microchip, obtenerDatosBasicos devuelve "(sin microchip)" — no lo precargamos tal cual
             campoMicrochip.setText(datosActuales[6].equals("(sin microchip)") ? "" : datosActuales[6]);
         }
 
         Button botonGuardar = new Button(esEdicion ? "Guardar cambios" : "Guardar");
+        FontIcon iconoGuardar = new FontIcon(Feather.CHECK);
+        iconoGuardar.setIconSize(16);
+        botonGuardar.setGraphic(iconoGuardar);
+        botonGuardar.getStyleClass().add("btn-primary");
 
         GridPane formulario = new GridPane();
         formulario.setPadding(new Insets(15));
@@ -87,7 +76,6 @@ public class FormularioMascota {
         formulario.add(botonGuardar, 1, 7);
 
         botonGuardar.setOnAction(evento -> {
-
             if (campoNombre.getText().isBlank() || campoEspecie.getText().isBlank()) {
                 mostrarError("El nombre y la especie son obligatorios.");
                 return;
@@ -96,7 +84,6 @@ public class FormularioMascota {
                 mostrarError("Elige una fecha de nacimiento.");
                 return;
             }
-            // NUEVO: una mascota no puede haber nacido "en el futuro"
             if (campoFecha.getValue().isAfter(LocalDate.now())) {
                 mostrarError("La fecha de nacimiento no puede ser posterior a hoy.");
                 return;
@@ -112,7 +99,6 @@ public class FormularioMascota {
                     campoMicrochip.getText()
             );
 
-            // Ejecutar guardado/actualización en background para no bloquear la UI
             botonGuardar.setDisable(true);
             new Thread(() -> {
                 try {
@@ -123,18 +109,30 @@ public class FormularioMascota {
                     }
                     javafx.application.Platform.runLater(() -> {
                         VirtuaPetApp.cargarListaMascotas();
-                        ventana.close();
+                        if (esEdicion) {
+                            Navegador.volverAtras();
+                        } else {
+                            Navegador.volverAlInicio();
+                        }
                     });
                 } catch (Exception e) {
-                    javafx.application.Platform.runLater(() -> mostrarError("Error al guardar: " + e.getMessage()));
-                    botonGuardar.setDisable(false);
+                    javafx.application.Platform.runLater(() -> {
+                        String msg = e.getMessage();
+                        if (msg != null && msg.contains("Ya existe una mascota")) {
+                            mostrarError(msg);
+                        } else {
+                            mostrarError("Error al guardar: " + msg);
+                        }
+                        botonGuardar.setDisable(false);
+                    });
                 }
             }, "guardar-mascota-thread").start();
         });
 
-        Scene escena = new Scene(formulario, 350, 320);
-        ventana.setScene(escena);
-        ventana.showAndWait();
+        ScrollPane scroll = new ScrollPane(formulario);
+        scroll.setFitToWidth(true);
+        scroll.setStyle("-fx-background-color: transparent; -fx-background: transparent;");
+        return scroll;
     }
 
     static void mostrarError(String mensaje) {

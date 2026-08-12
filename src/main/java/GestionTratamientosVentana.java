@@ -1,44 +1,58 @@
 import javafx.geometry.Insets;
-import javafx.scene.Scene;
+import javafx.scene.Node;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
+import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.GridPane;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
-import javafx.stage.Modality;
-import javafx.stage.Stage;
+import org.kordamp.ikonli.feather.Feather;
+import org.kordamp.ikonli.javafx.FontIcon;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
 
 public class GestionTratamientosVentana {
 
-    static void abrir(int idMascota, Runnable alGuardar) {
+    public static void abrir(int idMascota, Runnable alGuardar) {
+        Navegador.navegarA("Gestionar tratamientos", () -> crearVista(idMascota, alGuardar));
+    }
 
+    public static Node crearVista(int idMascota, Runnable alGuardar) {
         ArrayList<String[]> tratamientos = GestorMascotas.obtenerTratamientosConId(idMascota);
 
-        if (tratamientos.isEmpty()) {
-            Alert aviso = new Alert(Alert.AlertType.INFORMATION, "Esta mascota no tiene tratamientos registrados.");
-            aviso.showAndWait();
-            return;
-        }
+        Button botonAñadirNuevo = new Button("+ Añadir nuevo");
+        FontIcon iconoAñadir = new FontIcon(Feather.PLUS_CIRCLE);
+        iconoAñadir.setIconSize(16);
+        botonAñadirNuevo.setGraphic(iconoAñadir);
+        botonAñadirNuevo.getStyleClass().add("btn-primary");
+        botonAñadirNuevo.setOnAction(e -> FormularioRegistro.abrirTratamiento(idMascota, alGuardar));
 
-        Stage ventana = new Stage();
-        ventana.setTitle("Gestionar tratamientos");
-        ventana.initModality(Modality.APPLICATION_MODAL);
+        if (tratamientos.isEmpty()) {
+            VBox vacio = new VBox(14,
+                    new Label("Esta mascota no tiene tratamientos registrados."),
+                    botonAñadirNuevo
+            );
+            vacio.setPadding(new Insets(15));
+            ScrollPane scrollVacio = new ScrollPane(vacio);
+            scrollVacio.setFitToWidth(true);
+            scrollVacio.setFitToHeight(true);
+            scrollVacio.setStyle("-fx-background-color: transparent; -fx-background: transparent;");
+            return scrollVacio;
+        }
 
         ListView<String> lista = new ListView<>();
         for (String[] t : tratamientos) {
-            // t = [id, nombreMedicamento, dosis, frecuencia, fechaInicio, fechaFin]
             String textoFin = t[5].isEmpty() ? "crónico/indefinido" : "hasta " + t[5];
             lista.getItems().add(t[1] + " (" + t[2] + ") - " + textoFin);
         }
 
-        // Campos editables, vacíos hasta que se seleccione algo de la lista
         TextField campoMedicamento = new TextField();
         TextField campoDosis = new TextField();
         TextField campoFrecuencia = new TextField();
@@ -48,17 +62,14 @@ public class GestionTratamientosVentana {
         marcarCronico.setOnAction(e -> campoFin.setDisable(marcarCronico.isSelected()));
 
         Button botonGuardar = new Button("Guardar cambios");
-        botonGuardar.setDisable(true); // deshabilitado hasta que elijan un tratamiento de la lista
+        FontIcon iconoGuardar = new FontIcon(Feather.CHECK);
+        iconoGuardar.setIconSize(16);
+        botonGuardar.setGraphic(iconoGuardar);
+        botonGuardar.setDisable(true);
 
-        // NUEVO: un "listener" — código que se ejecuta automáticamente
-        // cada vez que cambia algo, sin que tú lo llames tú mismo.
-        // selectedItemProperty() es el "valor actualmente seleccionado en
-        // la lista"; addListener(...) le dice "avísame cada vez que cambie".
-        // Aquí lo usamos para rellenar los campos en cuanto seleccionan
-        // un tratamiento distinto en la lista.
         lista.getSelectionModel().selectedItemProperty().addListener((observable, valorAntiguo, valorNuevo) -> {
             int indice = lista.getSelectionModel().getSelectedIndex();
-            if (indice < 0) return; // nada seleccionado, no hacemos nada
+            if (indice < 0) return;
 
             String[] t = tratamientos.get(indice);
             campoMedicamento.setText(t[1]);
@@ -76,7 +87,7 @@ public class GestionTratamientosVentana {
                 campoFin.setDisable(false);
             }
 
-            botonGuardar.setDisable(false); // ya hay algo seleccionado, se puede guardar
+            botonGuardar.setDisable(false);
         });
 
         botonGuardar.setOnAction(evento -> {
@@ -87,7 +98,6 @@ public class GestionTratamientosVentana {
                 mostrarAviso("Medicamento y fecha de inicio son obligatorios.");
                 return;
             }
-            // NUEVO: misma validación que al crear, también al editar
             if (!marcarCronico.isSelected() && campoFin.getValue() != null
                     && campoFin.getValue().isBefore(campoInicio.getValue())) {
                 mostrarAviso("La fecha fin no puede ser anterior a la fecha de inicio.");
@@ -103,8 +113,8 @@ public class GestionTratamientosVentana {
                     GestorMascotas.actualizarTratamiento(idTratamiento, campoMedicamento.getText(),
                             campoDosis.getText(), campoFrecuencia.getText(), campoInicio.getValue(), fechaFin);
                     javafx.application.Platform.runLater(() -> {
-                        alGuardar.run();
-                        ventana.close();
+                        if (alGuardar != null) alGuardar.run();
+                        Navegador.volverAtras();
                     });
                 } catch (Exception e) {
                     javafx.application.Platform.runLater(() -> mostrarAviso("Error al actualizar: " + e.getMessage()));
@@ -128,18 +138,30 @@ public class GestionTratamientosVentana {
         camposEdicion.add(campoFin, 1, 4);
         camposEdicion.add(marcarCronico, 1, 5);
 
-        VBox contenido = new VBox(10,
-                new Label("Selecciona el tratamiento a modificar:"),
-                lista,
+        BorderPane layout = new BorderPane();
+        layout.setPadding(new Insets(15));
+
+        Label tituloInstruccion = new Label("Selecciona el tratamiento a modificar:");
+        tituloInstruccion.setPadding(new Insets(0, 0, 6, 0));
+        layout.setTop(tituloInstruccion);
+
+        VBox.setVgrow(lista, Priority.ALWAYS);
+        layout.setCenter(lista);
+
+        VBox seccionBottom = new VBox(10,
                 new Label("Edita los datos y guarda:"),
                 camposEdicion,
-                botonGuardar
+                botonGuardar,
+                botonAñadirNuevo
         );
-        contenido.setPadding(new Insets(15));
+        seccionBottom.setPadding(new Insets(10, 0, 0, 0));
+        layout.setBottom(seccionBottom);
 
-        Scene escena = new Scene(contenido, 420, 560);
-        ventana.setScene(escena);
-        ventana.showAndWait();
+        ScrollPane scroll = new ScrollPane(layout);
+        scroll.setFitToWidth(true);
+        scroll.setFitToHeight(true);
+        scroll.setStyle("-fx-background-color: transparent; -fx-background: transparent;");
+        return scroll;
     }
 
     private static void mostrarAviso(String mensaje) {

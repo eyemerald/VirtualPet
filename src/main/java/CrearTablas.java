@@ -5,7 +5,13 @@ import java.sql.Statement;
 
 public class CrearTablas {
 
-    static final String URL = "jdbc:sqlite:virtuapet.db";
+    // La URL ya no es una constante fija con ruta relativa: se calcula
+    // en tiempo de ejecución apuntando a la carpeta fija del usuario
+    // (ver RutasApp.java), para que funcione igual en desarrollo y una
+    // vez instalado con jpackage.
+    static String getUrl() {
+        return RutasApp.getUrlBaseDatos();
+    }
 
     static void crearTablas() {
 
@@ -69,7 +75,18 @@ public class CrearTablas {
                 + "FOREIGN KEY (mascota_id) REFERENCES mascotas(id) ON DELETE CASCADE"
                 + ")";
 
-        try (Connection conexion = DriverManager.getConnection(URL);
+        String sqlInformes = "CREATE TABLE IF NOT EXISTS informes ("
+                + "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                + "mascota_id INTEGER,"
+                + "tipo TEXT,"
+                + "descripcion TEXT,"
+                + "fecha TEXT,"
+                + "nombreArchivo TEXT,"
+                + "rutaArchivo TEXT,"
+                + "FOREIGN KEY (mascota_id) REFERENCES mascotas(id) ON DELETE CASCADE"
+                + ")"; 
+
+        try (Connection conexion = DriverManager.getConnection(getUrl());
              Statement sentencia = conexion.createStatement()) {
 
             sentencia.execute("PRAGMA foreign_keys = ON");
@@ -79,6 +96,7 @@ public class CrearTablas {
             sentencia.execute(sqlRevisiones);
             sentencia.execute(sqlTratamientos);
             sentencia.execute(sqlPesos);
+            sentencia.execute(sqlInformes);
             AppLogger.logInfo("Tablas comprobadas/creadas correctamente.");
 
         } catch (SQLException e) {
