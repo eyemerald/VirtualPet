@@ -9,6 +9,7 @@ import javafx.scene.control.ListView;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
@@ -48,7 +49,7 @@ public class GestionInformesVentana {
         iconoFolder.setIconSize(16);
         botonSeleccionar.setGraphic(iconoFolder);
 
-        Button botonGuardar = new Button("+ Añadir nuevo informe");
+        Button botonGuardar = new Button("Añadir informe");
         FontIcon iconoAñadir = new FontIcon(Feather.PLUS_CIRCLE);
         iconoAñadir.setIconSize(16);
         botonGuardar.setGraphic(iconoAñadir);
@@ -173,15 +174,17 @@ public class GestionInformesVentana {
         grid.add(campoFecha, 1, 2);
         grid.add(new Label("Archivo:"), 0, 3);
         grid.add(campoArchivo, 1, 3);
-        grid.add(botonSeleccionar, 1, 4);
-        grid.add(botonGuardar, 1, 5);
-        grid.add(botonAbrir, 1, 6);
-        grid.add(botonBorrar, 1, 7);
-        grid.add(botonLimpiar, 1, 8);
+
+        // Los botones ya no van uno por fila dentro del grid (dejaban un
+        // hueco enorme en blanco a la derecha) — van agrupados en una fila
+        // que se reparte el ancho disponible y salta de línea si hace falta.
+        FlowPane botonesAccion = new FlowPane(8, 8,
+                botonSeleccionar, botonGuardar, botonAbrir, botonBorrar, botonLimpiar);
 
         VBox contenidoFormulario = new VBox(10,
                 new Label("Añadir o editar informe:"),
-                grid
+                grid,
+                botonesAccion
         );
         contenidoFormulario.setPadding(new Insets(10, 0, 0, 0));
 

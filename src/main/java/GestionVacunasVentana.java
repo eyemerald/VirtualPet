@@ -5,6 +5,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
+import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
@@ -29,7 +30,7 @@ public class GestionVacunasVentana {
     public static Node crearVista(int idMascota, Runnable alGuardar) {
         ArrayList<String[]> vacunas = GestorMascotas.obtenerVacunasConId(idMascota);
 
-        Button botonAñadirNuevo = new Button("+ Añadir nuevo");
+        Button botonAñadirNuevo = new Button("Añadir nuevo");
         FontIcon iconoAñadir = new FontIcon(Feather.PLUS_CIRCLE);
         iconoAñadir.setIconSize(16);
         botonAñadirNuevo.setGraphic(iconoAñadir);
@@ -53,6 +54,37 @@ public class GestionVacunasVentana {
         for (String[] v : vacunas) {
             lista.getItems().add(v[1] + " (" + v[2] + ") - Próxima: " + v[3]);
         }
+
+        // Color según la fecha límite de la vacuna (Vencida: Rojo | Próxima <=30 días: Naranja)
+        lista.setCellFactory(lv -> new ListCell<String>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                    setStyle("");
+                } else {
+                    setText(item);
+                    try {
+                        String fechaStr = item.substring(item.lastIndexOf("Próxima: ") + 9).trim();
+                        LocalDate proxima = LocalDate.parse(fechaStr);
+                        LocalDate hoy = LocalDate.now();
+
+                        if (proxima.isBefore(hoy)) {
+                            // Vencida -> Rojo / Terracota
+                            setStyle("-fx-text-fill: #D9534F; -fx-font-weight: bold;");
+                        } else if (!proxima.isAfter(hoy.plusDays(30))) {
+                            // Próxima en 30 días o menos -> Ámbar / Naranja
+                            setStyle("-fx-text-fill: #E67E22; -fx-font-weight: bold;");
+                        } else {
+                            setStyle("");
+                        }
+                    } catch (Exception e) {
+                        setStyle("");
+                    }
+                }
+            }
+        });
 
         TextField campoNombre = new TextField();
         DatePicker campoFechaAplicacion = new DatePicker();

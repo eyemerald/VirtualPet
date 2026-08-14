@@ -45,8 +45,14 @@ public class RutasApp {
     // URL de conexión JDBC a la base de datos SQLite, ya apuntando a la
     // carpeta fija en vez de a una ruta relativa.
     static String getUrlBaseDatos() {
-        Path archivoDb = CARPETA_DATOS.resolve("virtuapet.db");
-        return "jdbc:sqlite:" + archivoDb.toAbsolutePath();
+        return "jdbc:sqlite:" + getArchivoBaseDatos().toAbsolutePath();
+    }
+
+    // Ruta directa (no la URL JDBC) al archivo virtuapet.db, para casos
+    // donde se necesita el propio archivo — por ejemplo, para incluirlo
+    // en una copia de seguridad en .zip.
+    static Path getArchivoBaseDatos() {
+        return CARPETA_DATOS.resolve("virtuapet.db");
     }
 
     // Carpeta donde viven las subcarpetas de cada mascota (informes, PDFs

@@ -37,7 +37,7 @@ public class GestionPesosVentana {
     public static Node crearVista(int idMascota, Runnable alGuardar) {
         ArrayList<String[]> pesos = GestorMascotas.obtenerPesosConId(idMascota);
 
-        Button botonAñadirNuevo = new Button("+ Añadir nuevo");
+        Button botonAñadirNuevo = new Button("Añadir nuevo");
         FontIcon iconoAñadir = new FontIcon(Feather.PLUS_CIRCLE);
         iconoAñadir.setIconSize(16);
         botonAñadirNuevo.setGraphic(iconoAñadir);
@@ -74,6 +74,8 @@ public class GestionPesosVentana {
         campoNotas.setWrapText(true);
         campoNotas.setPrefRowCount(1);
         campoNotas.setPromptText("Ej: pesada en casa");
+        campoNotas.setPrefWidth(200);
+        campoNotas.setMaxWidth(200);
 
         Button botonGuardar = new Button("Guardar cambios");
         FontIcon iconoGuardar = new FontIcon(Feather.CHECK);

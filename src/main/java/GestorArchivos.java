@@ -1,3 +1,5 @@
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
@@ -5,6 +7,8 @@ import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Objects;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 public class GestorArchivos {
 
 static String safeName(String s) {
@@ -54,5 +58,46 @@ static String safeName(String s) {
                 return FileVisitResult.CONTINUE;
             }
         });
+    }
+
+    // Genera un único .zip con TODO lo que VirtuaPet guarda: la base de
+    // datos (virtuapet.db) y la carpeta "mascotas" completa (todas las
+    // subcarpetas, con sus PDFs e informes). Pensado como copia de
+    // seguridad manual — y, el día de mañana, como el mismo formato que
+    // la app Android podría leer para importar los datos vía WiFi.
+    static void exportarTodo(File destinoZip) throws IOException {
+        try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(destinoZip.toPath()))) {
+
+            // 1. La base de datos, en la raíz del zip
+            Path archivoDb = RutasApp.getArchivoBaseDatos();
+            if (Files.exists(archivoDb)) {
+                agregarArchivoAlZip(zip, archivoDb, "virtuapet.db");
+            }
+
+            // 2. La carpeta "mascotas" completa, recorriendo todo lo que
+            // haya dentro (subcarpetas por mascota, con sus documentos)
+            Path carpetaMascotas = RutasApp.getCarpetaMascotas();
+            if (Files.exists(carpetaMascotas)) {
+                Files.walkFileTree(carpetaMascotas, new SimpleFileVisitor<Path>() {
+                    @Override
+                    public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                        // Ruta dentro del zip: relativa a "mascotas", nunca
+                        // la ruta absoluta del disco de este usuario
+                        Path relativa = carpetaMascotas.relativize(file);
+                        String rutaEnZip = "mascotas/" + relativa.toString().replace("\\", "/");
+                        agregarArchivoAlZip(zip, file, rutaEnZip);
+                        return FileVisitResult.CONTINUE;
+                    }
+                });
+            }
+        }
+    }
+
+    private static void agregarArchivoAlZip(ZipOutputStream zip, Path archivo, String nombreEnZip) throws IOException {
+        zip.putNextEntry(new ZipEntry(nombreEnZip));
+        try (FileInputStream entrada = new FileInputStream(archivo.toFile())) {
+            entrada.transferTo(zip);
+        }
+        zip.closeEntry();
     }
 }

@@ -27,7 +27,7 @@ public class GestionTratamientosVentana {
     public static Node crearVista(int idMascota, Runnable alGuardar) {
         ArrayList<String[]> tratamientos = GestorMascotas.obtenerTratamientosConId(idMascota);
 
-        Button botonAñadirNuevo = new Button("+ Añadir nuevo");
+        Button botonAñadirNuevo = new Button("Añadir nuevo");
         FontIcon iconoAñadir = new FontIcon(Feather.PLUS_CIRCLE);
         iconoAñadir.setIconSize(16);
         botonAñadirNuevo.setGraphic(iconoAñadir);

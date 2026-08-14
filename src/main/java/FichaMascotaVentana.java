@@ -77,17 +77,17 @@ public class FichaMascotaVentana {
             avisoVacunas.setText(construirAvisoVacunas(idMascota));
         };
 
-        VBox cardVacunas = crearTarjetaClicable("Vacunas", Feather.SHIELD, "#4A9B7F", contenidoVacunas, 
-            () -> GestionVacunasVentana.abrir(idMascota, refrescarTarjetas));
+        VBox cardVacunas = crearTarjetaClicable("Vacunas", Feather.SHIELD, "#4A9B7F", contenidoVacunas,
+                () -> GestionVacunasVentana.abrir(idMascota, refrescarTarjetas));
 
-        VBox cardTratamientos = crearTarjetaClicable("Tratamientos", Feather.CLIPBOARD, "#5B7C99", contenidoTratamientos, 
-            () -> GestionTratamientosVentana.abrir(idMascota, refrescarTarjetas));
+        VBox cardTratamientos = crearTarjetaClicable("Tratamientos", Feather.CLIPBOARD, "#5B7C99", contenidoTratamientos,
+                () -> GestionTratamientosVentana.abrir(idMascota, refrescarTarjetas));
 
-        VBox cardPesos = crearTarjetaClicable("Pesos", Feather.TRENDING_UP, "#4A9B7F", contenidoPesos, 
-            () -> GestionPesosVentana.abrir(idMascota, refrescarTarjetas));
+        VBox cardPesos = crearTarjetaClicable("Pesos", Feather.TRENDING_UP, "#4A9B7F", contenidoPesos,
+                () -> GestionPesosVentana.abrir(idMascota, refrescarTarjetas));
 
-        VBox cardInformes = crearTarjetaClicable("Informes", Feather.FILE_TEXT, "#5B7C99", contenidoInformes, 
-            () -> GestionInformesVentana.abrir(idMascota, refrescarTarjetas));
+        VBox cardInformes = crearTarjetaClicable("Informes", Feather.FILE_TEXT, "#5B7C99", contenidoInformes,
+                () -> GestionInformesVentana.abrir(idMascota, refrescarTarjetas));
 
         FlowPane filaTarjetas = new FlowPane(12, 12, cardVacunas, cardTratamientos, cardPesos, cardInformes);
 
@@ -106,13 +106,32 @@ public class FichaMascotaVentana {
         iconoExportar.setIconSize(16);
         botonExportar.setGraphic(iconoExportar);
         botonExportar.getStyleClass().add("btn-primary");
+
         botonExportar.setOnAction(evento -> {
+            ButtonType btnCompleto = new ButtonType("Completo (Veterinario)");
+            ButtonType btnResumen = new ButtonType("Resumen (Cuidador)");
+            ButtonType btnCancelar = ButtonType.CANCEL;
+
+            Alert dialogo = new Alert(AlertType.CONFIRMATION,
+                    "¿Qué tipo de informe deseas generar?",
+                    btnCompleto, btnResumen, btnCancelar);
+            dialogo.setHeaderText("Opciones de exportación PDF");
+            dialogo.setTitle("Exportar informe");
+
+            Optional<ButtonType> seleccion = dialogo.showAndWait();
+            if (!seleccion.isPresent() || seleccion.get() == btnCancelar) {
+                return;
+            }
+
+            boolean esResumen = (seleccion.get() == btnResumen);
+
             botonExportar.setDisable(true);
             new Thread(() -> {
                 try {
-                    ExportadorMascota.exportarFicha(idMascota, true);
+                    ExportadorMascota.exportarFicha(idMascota, esResumen);
                     javafx.application.Platform.runLater(() -> {
-                        mostrarAviso(AlertType.INFORMATION, "PDF generado correctamente.");
+                        String tipoTexto = esResumen ? "Resumen" : "Completo";
+                        mostrarAviso(AlertType.INFORMATION, "PDF (" + tipoTexto + ") generado correctamente.");
                         botonExportar.setDisable(false);
                     });
                 } catch (Exception e) {
@@ -284,7 +303,7 @@ public class FichaMascotaVentana {
     private static String obtenerInformesResumen(int idMascota) {
         ArrayList<String[]> informes = GestorMascotas.obtenerInformesConId(idMascota);
         if (informes.isEmpty()) return "Sin documentos";
-        
+
         return informes.size() + " documento" + (informes.size() > 1 ? "s" : "");
     }
 

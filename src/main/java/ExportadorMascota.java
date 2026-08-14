@@ -13,7 +13,6 @@ import java.time.LocalDateTime;
 
 public class ExportadorMascota {
 
-    // Método de ayuda: escribe UNA línea de texto en la posición (x, y) indicada.
     static void escribirLinea(PDPageContentStream contenido, String texto,
                               float x, float y, float tamaño) throws IOException {
         String textoSeguro = texto.replace("⚠", "[AVISO]");
@@ -24,10 +23,8 @@ public class ExportadorMascota {
         contenido.endText();
     }
 
-    // CAMBIO: Ahora recibe 'int idMascota' en lugar de 'String microchip'
-    static void exportarFicha(int idMascota, boolean soloTratamientosActuales) {
+    static void exportarFicha(int idMascota, boolean esResumen) {
 
-        // Consultamos los datos por ID
         String[] datos = GestorMascotas.obtenerDatosBasicos(idMascota);
         if (datos == null) {
             System.out.println("No se encontró ninguna mascota con ese ID.");
@@ -35,7 +32,7 @@ public class ExportadorMascota {
         }
 
         float margen = 50;
-        float y = 750; // empezamos cerca de la parte de arriba de la página
+        float y = 750;
 
         try (PDDocument documento = new PDDocument()) {
             PDPage pagina = new PDPage();
@@ -44,7 +41,8 @@ public class ExportadorMascota {
             try (PDPageContentStream contenido = new PDPageContentStream(documento, pagina)) {
 
                 // --- Cabecera con los datos básicos ---
-                escribirLinea(contenido, "Ficha de " + datos[0], margen, y, 16);
+                String tituloPDF = esResumen ? "Ficha Resumen - " + datos[0] : "Ficha Clínica Completa - " + datos[0];
+                escribirLinea(contenido, tituloPDF, margen, y, 16);
                 y -= 25;
                 escribirLinea(contenido, "Especie: " + datos[1] + "   |   Raza: " + datos[2], margen, y, 11);
                 y -= 15;
@@ -53,42 +51,41 @@ public class ExportadorMascota {
                 escribirLinea(contenido, "Sexo: " + datos[4] + "   |   Color: " + datos[5], margen, y, 11);
                 y -= 15;
 
-                // Si el microchip no se rellenó o viene vacío, lo gestionamos limpiamente
                 String chipTexto = (datos[6] == null || datos[6].trim().isEmpty()) ? "Sin microchip" : datos[6];
                 escribirLinea(contenido, "Microchip: " + chipTexto, margen, y, 11);
                 y -= 30;
 
-                // --- Vacunas: siempre todas ---
-                y = escribirSeccion(contenido, "Vacunas", GestorMascotas.obtenerLineasVacunas(idMascota), margen, y);
+                if (esResumen) {
+                    // --- Modo Resumen (Cuidador): Tratamientos Activos únicamente ---
+                    ArrayList<String> tratamientosActivos = GestorMascotas.obtenerLineasTratamientos(idMascota, true);
+                    y = escribirSeccion(contenido, "Tratamientos activos", tratamientosActivos, margen, y);
+                } else {
+                    // --- Modo Completo (Veterinario): Todo el historial ---
+                    y = escribirSeccion(contenido, "Vacunas", GestorMascotas.obtenerLineasVacunas(idMascota), margen, y);
+                    y = escribirSeccion(contenido, "Revisiones", GestorMascotas.obtenerLineasRevisiones(idMascota), margen, y);
 
-                // --- Revisiones: siempre todas ---
-                y = escribirSeccion(contenido, "Revisiones", GestorMascotas.obtenerLineasRevisiones(idMascota), margen, y);
+                    ArrayList<String> tratamientosTodos = GestorMascotas.obtenerLineasTratamientos(idMascota, false);
+                    y = escribirSeccion(contenido, "Tratamientos (historial completo)", tratamientosTodos, margen, y);
 
-                // --- Tratamientos: filtrados según el parámetro ---
-                String tituloTratamientos = soloTratamientosActuales ? "Tratamientos actuales" : "Tratamientos (todos)";
-                ArrayList<String> tratamientos = GestorMascotas.obtenerLineasTratamientos(idMascota, soloTratamientosActuales);
-                y = escribirSeccion(contenido, tituloTratamientos, tratamientos, margen, y);
-
-                // --- Historial de peso: siempre todo ---
-                escribirSeccion(contenido, "Historial de peso", GestorMascotas.obtenerLineasPesos(idMascota), margen, y);
+                    escribirSeccion(contenido, "Historial de peso", GestorMascotas.obtenerLineasPesos(idMascota), margen, y);
+                }
             }
 
-            // Sanitizamos el nombre para usar en la carpeta y nombre de archivo
+            // Sanitizamos el nombre de archivo
             String nombreMascota = (datos[0] == null) ? "mascota" : datos[0];
             String safeName = nombreMascota.replaceAll("[^a-zA-Z0-9-_.]", "_");
             if (safeName.length() > 50) safeName = safeName.substring(0, 50);
 
-            // Aseguramos carpeta de la mascota
             try {
                 GestorArchivos.crearCarpetaMascota(idMascota, nombreMascota);
             } catch (Exception e) {
                 AppLogger.logSevere("No se pudo crear la carpeta de la mascota: " + e.getMessage());
             }
 
-            // Añadimos timestamp para evitar sobrescribir
             DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd_HHmmss");
-            String timestamp = java.time.LocalDateTime.now().format(fmt);
-            String nombreArchivo = safeName + "_ficha_" + timestamp + ".pdf";
+            String timestamp = LocalDateTime.now().format(fmt);
+            String sufijo = esResumen ? "_resumen_" : "_completo_";
+            String nombreArchivo = safeName + sufijo + timestamp + ".pdf";
 
             Path carpeta = Path.of("mascotas", idMascota + "_" + GestorArchivos.safeName(nombreMascota));
             try {
@@ -121,6 +118,6 @@ public class ExportadorMascota {
             }
         }
 
-        return y - 15; // margen extra antes de la siguiente sección
+        return y - 15;
     }
 }

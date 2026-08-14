@@ -30,7 +30,7 @@ public class GestionRevisionesVentana {
     public static Node crearVista(int idMascota, Runnable alGuardar) {
         ArrayList<String[]> revisiones = GestorMascotas.obtenerRevisionesConId(idMascota);
 
-        Button botonAñadirNuevo = new Button("+ Añadir nuevo");
+        Button botonAñadirNuevo = new Button("Añadir nuevo");
         FontIcon iconoAñadir = new FontIcon(Feather.PLUS_CIRCLE);
         iconoAñadir.setIconSize(16);
         botonAñadirNuevo.setGraphic(iconoAñadir);
