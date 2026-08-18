@@ -86,6 +86,16 @@ public class CrearTablas {
                 + "FOREIGN KEY (mascota_id) REFERENCES mascotas(id) ON DELETE CASCADE"
                 + ")"; 
 
+        // "A tener en cuenta": notas libres apiladas (agresividad, manías,
+        // alergias...). Sin fecha, solo texto — se ordenan por orden de
+        // creación (la más reciente primero).
+        String sqlNotas = "CREATE TABLE IF NOT EXISTS notas_importantes ("
+                + "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                + "mascota_id INTEGER,"
+                + "texto TEXT,"
+                + "FOREIGN KEY (mascota_id) REFERENCES mascotas(id) ON DELETE CASCADE"
+                + ")";
+
         try (Connection conexion = DriverManager.getConnection(getUrl());
              Statement sentencia = conexion.createStatement()) {
 
@@ -97,6 +107,7 @@ public class CrearTablas {
             sentencia.execute(sqlTratamientos);
             sentencia.execute(sqlPesos);
             sentencia.execute(sqlInformes);
+            sentencia.execute(sqlNotas);
             AppLogger.logInfo("Tablas comprobadas/creadas correctamente.");
 
         } catch (SQLException e) {

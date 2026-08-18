@@ -59,31 +59,6 @@ public class GestorMascotas {
         return lista;
     }
 
-    // ================== SELECCIÓN ==================
-
-    static ArrayList<Integer> mostrarMascotasParaSeleccion() {
-        ArrayList<Integer> ids = new ArrayList<>();
-        String sql = "SELECT id, nombre, especie FROM mascotas";
-
-        try (Connection conexion = abrirConexion();
-             Statement sentencia = conexion.createStatement();
-             ResultSet filas = sentencia.executeQuery(sql)) {
-
-            int numero = 1;
-            while (filas.next()) {
-                System.out.println(numero + ". " + filas.getString("nombre")
-                        + " (" + filas.getString("especie") + ")");
-                ids.add(filas.getInt("id"));
-                numero++;
-            }
-
-        } catch (SQLException e) {
-            AppLogger.logSevere("Error al leer las mascotas: " + e.getMessage());
-        }
-
-        return ids;
-    }
-
     // ================== GUARDAR ==================
 
     static int guardarMascota(Mascota m) throws Exception {
@@ -842,6 +817,91 @@ public class GestorMascotas {
         }
     }
 
+    // ================== NOTAS "A TENER EN CUENTA" ==================
+
+    static ArrayList<String[]> obtenerNotasConId(int idMascota) {
+        ArrayList<String[]> lista = new ArrayList<>();
+        String sql = "SELECT id, texto FROM notas_importantes WHERE mascota_id = ? ORDER BY id DESC";
+
+        try (Connection conexion = abrirConexion();
+             PreparedStatement sentencia = conexion.prepareStatement(sql)) {
+
+            sentencia.setInt(1, idMascota);
+
+            try (ResultSet filas = sentencia.executeQuery()) {
+                while (filas.next()) {
+                    lista.add(new String[]{
+                            filas.getString("id"),
+                            filas.getString("texto")
+                    });
+                }
+            }
+
+        } catch (SQLException e) {
+            AppLogger.logSevere("Error al leer las notas: " + e.getMessage());
+        }
+
+        return lista;
+    }
+
+    static void guardarNota(int idMascota, String texto) {
+        String sql = "INSERT INTO notas_importantes (mascota_id, texto) VALUES (?, ?)";
+
+        try (Connection conexion = abrirConexion();
+             PreparedStatement sentencia = conexion.prepareStatement(sql)) {
+
+            sentencia.setInt(1, idMascota);
+            sentencia.setString(2, texto);
+
+            sentencia.executeUpdate();
+            AppLogger.logInfo("Nota guardada.");
+
+        } catch (SQLException e) {
+            AppLogger.logSevere("Error al guardar la nota: " + e.getMessage());
+        }
+    }
+
+    static void actualizarNota(int idNota, String texto) {
+        String sql = "UPDATE notas_importantes SET texto = ? WHERE id = ?";
+
+        try (Connection conexion = abrirConexion();
+             PreparedStatement sentencia = conexion.prepareStatement(sql)) {
+
+            sentencia.setString(1, texto);
+            sentencia.setInt(2, idNota);
+
+            sentencia.executeUpdate();
+            AppLogger.logInfo("Nota actualizada.");
+
+        } catch (SQLException e) {
+            AppLogger.logSevere("Error al actualizar la nota: " + e.getMessage());
+        }
+    }
+
+    static void borrarNota(int idNota) {
+        String sql = "DELETE FROM notas_importantes WHERE id = ?";
+
+        try (Connection conexion = abrirConexion();
+             PreparedStatement sentencia = conexion.prepareStatement(sql)) {
+
+            sentencia.setInt(1, idNota);
+            sentencia.executeUpdate();
+            AppLogger.logInfo("Nota borrada.");
+
+        } catch (SQLException e) {
+            AppLogger.logSevere("Error al borrar la nota: " + e.getMessage());
+        }
+    }
+
+    // Texto plano para incluir en el PDF exportado
+    static ArrayList<String> obtenerLineasNotas(int idMascota) {
+        ArrayList<String> lineas = new ArrayList<>();
+        for (String[] n : obtenerNotasConId(idMascota)) {
+            lineas.add(n[1]);
+        }
+        return lineas;
+    }
+
     static ArrayList<String> obtenerLineasTratamientos(int idMascota, boolean soloActuales) {
         ArrayList<String> lista = new ArrayList<>();
 
@@ -900,82 +960,4 @@ public class GestorMascotas {
         return lineas;
     }
 
-    // ================== LEER (para consola) ==================
-
-    static void mostrarTodasLasMascotas() {
-        String sql = "SELECT * FROM mascotas";
-
-        try (Connection conexion = abrirConexion();
-             Statement sentencia = conexion.createStatement();
-             ResultSet filas = sentencia.executeQuery(sql)) {
-
-            boolean hayMascotas = false;
-
-            while (filas.next()) {
-                hayMascotas = true;
-
-                int id = filas.getInt("id");
-                String nombre = filas.getString("nombre");
-                String especie = filas.getString("especie");
-                String raza = filas.getString("raza");
-                String microchip = filas.getString("microchip");
-
-                System.out.println("\n===== FICHA DE " + nombre.toUpperCase() + " =====");
-                System.out.println("Especie: " + especie + " | Raza: " + raza);
-                System.out.println("Microchip: " + (microchip == null || microchip.isEmpty() ? "(sin microchip)" : microchip));
-
-                mostrarVacunasDe(id);
-                mostrarRevisionesDe(id);
-                mostrarTratamientosDe(id);
-                mostrarPesosDe(id);
-            }
-
-            if (!hayMascotas) {
-                System.out.println("Todavía no hay ninguna mascota guardada.");
-            }
-
-        } catch (SQLException e) {
-            AppLogger.logSevere("Error al leer las mascotas: " + e.getMessage());
-        }
-    }
-
-    static void mostrarVacunasDe(int idMascota) {
-        System.out.println("Vacunas:");
-        ArrayList<String> lineas = obtenerLineasVacunas(idMascota);
-        if (lineas.isEmpty()) {
-            System.out.println("- (sin vacunas registradas)");
-        } else {
-            for (String linea : lineas) System.out.println("- " + linea);
-        }
-    }
-
-    static void mostrarRevisionesDe(int idMascota) {
-        System.out.println("Revisiones:");
-        ArrayList<String> lineas = obtenerLineasRevisiones(idMascota);
-        if (lineas.isEmpty()) {
-            System.out.println("- (sin revisiones registradas)");
-        } else {
-            for (String linea : lineas) System.out.println("- " + linea);
-        }
-    }
-
-    static void mostrarTratamientosDe(int idMascota) {
-        System.out.println("Tratamientos:");
-        ArrayList<String> lineas = obtenerLineasTratamientos(idMascota, false);
-        if (lineas.isEmpty()) {
-            System.out.println("- (sin tratamientos registrados)");
-        } else {
-            for (String linea : lineas) System.out.println("- " + linea);
-        }
-    }
-
-    static void mostrarPesosDe(int idMascota) {
-        System.out.println("Historial de peso:");
-        ArrayList<String> lineas = obtenerLineasPesos(idMascota);
-        if (lineas.isEmpty()) {
-            System.out.println("- (sin registros de peso)");
-        } else {
-            for (String linea : lineas) System.out.println("- " + linea);
-        }
-    }
 }

@@ -21,6 +21,10 @@ public class AppLogger {
         LOGGER.info(msg);
     }
 
+    public static void logWarning(String msg) {
+        LOGGER.warning(msg);
+    }
+
     public static void logSevere(String msg) {
         LOGGER.severe(msg);
     }

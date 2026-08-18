@@ -63,17 +63,19 @@ public class FichaMascotaVentana {
         headerContent.getStyleClass().add("card");
         headerContent.setPadding(new Insets(14));
 
-        // --- Tarjetas de resumen: VACUNAS / TRATAMIENTOS / PESOS / INFORMES ---
+        // --- Tarjetas de resumen: VACUNAS / TRATAMIENTOS / PESOS / INFORMES / NOTAS ---
         Label contenidoVacunas = crearContenidoTarjeta();
         Label contenidoTratamientos = crearContenidoTarjeta();
         Label contenidoPesos = crearContenidoTarjeta();
         Label contenidoInformes = crearContenidoTarjeta();
+        Label contenidoNotas = crearContenidoTarjeta();
 
         Runnable refrescarTarjetas = () -> {
             contenidoVacunas.setText(obtenerProximaVacuna(idMascota));
             contenidoTratamientos.setText(obtenerTratamientosResumen(idMascota));
             contenidoPesos.setText(obtenerUltimoPesoResumen(idMascota));
             contenidoInformes.setText(obtenerInformesResumen(idMascota));
+            contenidoNotas.setText(obtenerNotasResumen(idMascota));
             avisoVacunas.setText(construirAvisoVacunas(idMascota));
         };
 
@@ -89,7 +91,12 @@ public class FichaMascotaVentana {
         VBox cardInformes = crearTarjetaClicable("Informes", Feather.FILE_TEXT, "#5B7C99", contenidoInformes,
                 () -> GestionInformesVentana.abrir(idMascota, refrescarTarjetas));
 
-        FlowPane filaTarjetas = new FlowPane(12, 12, cardVacunas, cardTratamientos, cardPesos, cardInformes);
+        // Icono/color distinto (ámbar) para que destaque como "información
+        // importante a leer", coherente con el color de aviso de vacunas
+        VBox cardNotas = crearTarjetaClicable("A tener en cuenta", Feather.ALERT_TRIANGLE, "#C4972E", contenidoNotas,
+                () -> GestionNotasVentana.abrir(idMascota, refrescarTarjetas));
+
+        FlowPane filaTarjetas = new FlowPane(12, 12, cardVacunas, cardTratamientos, cardPesos, cardInformes, cardNotas);
 
         refrescarTarjetas.run(); // relleno inicial
 
@@ -165,7 +172,7 @@ public class FichaMascotaVentana {
                 try {
                     GestorArchivos.borrarCarpetaMascota(idMascota, datos[0]);
                 } catch (Exception e) {
-                    System.out.println("Aviso: no se pudo borrar la carpeta de la mascota: " + e.getMessage());
+                    AppLogger.logWarning("Aviso: no se pudo borrar la carpeta de la mascota: " + e.getMessage());
                 }
             }
 
@@ -305,6 +312,19 @@ public class FichaMascotaVentana {
         if (informes.isEmpty()) return "Sin documentos";
 
         return informes.size() + " documento" + (informes.size() > 1 ? "s" : "");
+    }
+
+    private static String obtenerNotasResumen(int idMascota) {
+        ArrayList<String[]> notas = GestorMascotas.obtenerNotasConId(idMascota);
+        if (notas.isEmpty()) return "Sin notas";
+
+        // Ya vienen ordenadas por id descendente (ver GestorMascotas),
+        // así que la primera es la más reciente
+        String textoMasReciente = notas.get(0)[1];
+        if (textoMasReciente.length() > 60) {
+            textoMasReciente = textoMasReciente.substring(0, 60) + "...";
+        }
+        return textoMasReciente;
     }
 
     static void mostrarAviso(AlertType tipo, String mensaje) {

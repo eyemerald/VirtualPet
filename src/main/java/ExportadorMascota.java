@@ -15,19 +15,40 @@ public class ExportadorMascota {
 
     static void escribirLinea(PDPageContentStream contenido, String texto,
                               float x, float y, float tamaño) throws IOException {
+        escribirLinea(contenido, texto, x, y, tamaño, false);
+    }
+
+    // Con soporte de negrita, para diferenciar títulos de secciones del
+    // texto normal — antes todo el PDF usaba el mismo peso de fuente,
+    // lo que lo hacía verse plano y difícil de escanear visualmente.
+    static void escribirLinea(PDPageContentStream contenido, String texto,
+                              float x, float y, float tamaño, boolean negrita) throws IOException {
         String textoSeguro = texto.replace("⚠", "[AVISO]");
+        Standard14Fonts.FontName fuente = negrita
+                ? Standard14Fonts.FontName.HELVETICA_BOLD
+                : Standard14Fonts.FontName.HELVETICA;
         contenido.beginText();
-        contenido.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), tamaño);
+        contenido.setFont(new PDType1Font(fuente), tamaño);
         contenido.newLineAtOffset(x, y);
         contenido.showText(textoSeguro);
         contenido.endText();
+    }
+
+    // Línea horizontal fina, usada para separar visualmente cada sección
+    // (vacunas, tratamientos...) de la siguiente — antes todo quedaba
+    // apilado sin ninguna separación clara.
+    static void dibujarSeparador(PDPageContentStream contenido, float x1, float y, float x2) throws IOException {
+        contenido.setLineWidth(0.6f);
+        contenido.moveTo(x1, y);
+        contenido.lineTo(x2, y);
+        contenido.stroke();
     }
 
     static void exportarFicha(int idMascota, boolean esResumen) {
 
         String[] datos = GestorMascotas.obtenerDatosBasicos(idMascota);
         if (datos == null) {
-            System.out.println("No se encontró ninguna mascota con ese ID.");
+            AppLogger.logWarning("No se encontró ninguna mascota con ese ID.");
             return;
         }
 
@@ -42,7 +63,7 @@ public class ExportadorMascota {
 
                 // --- Cabecera con los datos básicos ---
                 String tituloPDF = esResumen ? "Ficha Resumen - " + datos[0] : "Ficha Clínica Completa - " + datos[0];
-                escribirLinea(contenido, tituloPDF, margen, y, 16);
+                escribirLinea(contenido, tituloPDF, margen, y, 16, true);
                 y -= 25;
                 escribirLinea(contenido, "Especie: " + datos[1] + "   |   Raza: " + datos[2], margen, y, 11);
                 y -= 15;
@@ -56,11 +77,15 @@ public class ExportadorMascota {
                 y -= 30;
 
                 if (esResumen) {
-                    // --- Modo Resumen (Cuidador): Tratamientos Activos únicamente ---
+                    // --- Modo Resumen (Cuidador): lo importante primero,
+                    // luego los tratamientos activos ---
+                    y = escribirSeccion(contenido, "A tener en cuenta", GestorMascotas.obtenerLineasNotas(idMascota), margen, y);
                     ArrayList<String> tratamientosActivos = GestorMascotas.obtenerLineasTratamientos(idMascota, true);
                     y = escribirSeccion(contenido, "Tratamientos activos", tratamientosActivos, margen, y);
                 } else {
-                    // --- Modo Completo (Veterinario): Todo el historial ---
+                    // --- Modo Completo (Veterinario): todo el historial,
+                    // con "A tener en cuenta" también destacado al principio ---
+                    y = escribirSeccion(contenido, "A tener en cuenta", GestorMascotas.obtenerLineasNotas(idMascota), margen, y);
                     y = escribirSeccion(contenido, "Vacunas", GestorMascotas.obtenerLineasVacunas(idMascota), margen, y);
                     y = escribirSeccion(contenido, "Revisiones", GestorMascotas.obtenerLineasRevisiones(idMascota), margen, y);
 
@@ -87,7 +112,7 @@ public class ExportadorMascota {
             String sufijo = esResumen ? "_resumen_" : "_completo_";
             String nombreArchivo = safeName + sufijo + timestamp + ".pdf";
 
-            Path carpeta = Path.of("mascotas", idMascota + "_" + GestorArchivos.safeName(nombreMascota));
+            Path carpeta = RutasApp.getCarpetaMascotas().resolve(idMascota + "_" + GestorArchivos.safeName(nombreMascota));
             try {
                 if (!Files.exists(carpeta)) Files.createDirectories(carpeta);
                 Path destino = carpeta.resolve(nombreArchivo);
@@ -105,8 +130,12 @@ public class ExportadorMascota {
     static float escribirSeccion(PDPageContentStream contenido, String titulo,
                                  ArrayList<String> lineas, float margen, float y) throws IOException {
 
-        escribirLinea(contenido, titulo + ":", margen, y, 13);
-        y -= 18;
+        // Línea separadora fina antes del título, para que cada sección
+        // se distinga claramente de la anterior de un vistazo
+        dibujarSeparador(contenido, margen, y + 6, 545);
+
+        escribirLinea(contenido, titulo, margen, y - 6, 13, true); // negrita
+        y -= 24;
 
         if (lineas.isEmpty()) {
             escribirLinea(contenido, "- (sin registros)", margen, y, 10);
