@@ -35,7 +35,7 @@ public class GestionInformesVentana {
 
         ListView<String> lista = new ListView<>();
         for (String[] i : informes) {
-            lista.getItems().add(i[1] + " - " + i[3] + " (" + i[2] + ")");
+            lista.getItems().add(i[1] + " - " + UtilidadesFecha.formatearFechaES(i[3]) + " (" + i[2] + ")");
         }
 
         TextField campoTipo = new TextField();
@@ -55,6 +55,15 @@ public class GestionInformesVentana {
         botonGuardar.setGraphic(iconoAñadir);
         botonGuardar.getStyleClass().add("btn-primary");
         botonGuardar.setDisable(false);
+
+        // Botón nuevo: faltaba por completo la posibilidad de editar un
+        // informe ya existente — solo se podía crear uno nuevo. Se activa
+        // solo cuando hay un informe seleccionado en la lista.
+        Button botonGuardarCambios = new Button("Guardar cambios");
+        FontIcon iconoGuardarCambios = new FontIcon(Feather.CHECK);
+        iconoGuardarCambios.setIconSize(16);
+        botonGuardarCambios.setGraphic(iconoGuardarCambios);
+        botonGuardarCambios.setDisable(true);
 
         Button botonBorrar = new Button("Borrar");
         FontIcon iconoBorrar = new FontIcon(Feather.TRASH_2);
@@ -94,6 +103,7 @@ public class GestionInformesVentana {
             campoArchivo.setText(datos[4]);
             botonBorrar.setDisable(false);
             botonAbrir.setDisable(false);
+            botonGuardarCambios.setDisable(false);
         });
 
         lista.setOnMouseClicked(evento -> {
@@ -133,6 +143,41 @@ public class GestionInformesVentana {
             }, "guardar-informe-thread").start();
         });
 
+        // Guarda cambios en un informe ya existente (tipo, descripción,
+        // fecha) sin necesidad de volver a seleccionar el archivo — a
+        // diferencia de "Añadir informe", que exige archivo obligatorio.
+        botonGuardarCambios.setOnAction(ev -> {
+            int idx = lista.getSelectionModel().getSelectedIndex();
+            if (idx < 0) return;
+
+            if (campoTipo.getText().isBlank()) {
+                mostrarAviso("Tipo es obligatorio.");
+                return;
+            }
+            if (campoFecha.getValue() == null) {
+                mostrarAviso("Fecha es obligatoria.");
+                return;
+            }
+
+            int idInforme = Integer.parseInt(informes.get(idx)[0]);
+
+            botonGuardarCambios.setDisable(true);
+            new Thread(() -> {
+                try {
+                    GestorMascotas.actualizarInforme(idInforme, campoTipo.getText(), campoDescripcion.getText(), campoFecha.getValue().toString());
+                    javafx.application.Platform.runLater(() -> {
+                        if (alGuardar != null) alGuardar.run();
+                        Navegador.volverAtras();
+                    });
+                } catch (Exception e) {
+                    javafx.application.Platform.runLater(() -> {
+                        mostrarAviso("Error al actualizar: " + e.getMessage());
+                        botonGuardarCambios.setDisable(false);
+                    });
+                }
+            }, "actualizar-informe-thread").start();
+        });
+
         botonBorrar.setOnAction(ev -> {
             int idx = lista.getSelectionModel().getSelectedIndex();
             if (idx < 0) return;
@@ -159,6 +204,7 @@ public class GestionInformesVentana {
             lista.getSelectionModel().clearSelection();
             botonBorrar.setDisable(true);
             botonAbrir.setDisable(true);
+            botonGuardarCambios.setDisable(true);
         });
 
         GridPane grid = new GridPane();
@@ -179,7 +225,7 @@ public class GestionInformesVentana {
         // hueco enorme en blanco a la derecha) — van agrupados en una fila
         // que se reparte el ancho disponible y salta de línea si hace falta.
         FlowPane botonesAccion = new FlowPane(8, 8,
-                botonSeleccionar, botonGuardar, botonAbrir, botonBorrar, botonLimpiar);
+                botonSeleccionar, botonGuardar, botonGuardarCambios, botonAbrir, botonBorrar, botonLimpiar);
 
         VBox contenidoFormulario = new VBox(10,
                 new Label("Añadir o editar informe:"),

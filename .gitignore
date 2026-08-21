@@ -28,22 +28,22 @@ bin/
 
 ### Mac OS ###
 .DS_Store
-### VirtuaPet (archivos generados por el propio programa, no código) ###
+### VirtualPet (archivos generados por el propio programa, no código) ###
 virtuapet.db
 *.pdf
 .idea/libraries/
 
-### VirtuaPet - Maven ###
+### VirtualPet - Maven ###
 target/
 
-### VirtuaPet - Logs ###
+### VirtualPet - Logs ###
 *.log
 
-### VirtuaPet - IDE (config personal, no debe compartirse) ###
+### VirtualPet - IDE (config personal, no debe compartirse) ###
 .idea/
 *.iml
 
-### VirtuaPet - runtime y binarios generados ###
+### VirtualPet - runtime y binarios generados ###
 runtime-reducido/
 instalador/
 

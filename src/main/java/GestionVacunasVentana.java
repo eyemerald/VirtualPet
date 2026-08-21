@@ -52,7 +52,7 @@ public class GestionVacunasVentana {
 
         ListView<String> lista = new ListView<>();
         for (String[] v : vacunas) {
-            lista.getItems().add(v[1] + " (" + v[2] + ") - Próxima: " + v[3]);
+            lista.getItems().add(v[1] + " (" + UtilidadesFecha.formatearFechaES(v[2]) + ") - Próxima: " + UtilidadesFecha.formatearFechaES(v[3]));
         }
 
         // Color según la fecha límite de la vacuna (Vencida: Rojo | Próxima <=30 días: Naranja)
@@ -67,7 +67,7 @@ public class GestionVacunasVentana {
                     setText(item);
                     try {
                         String fechaStr = item.substring(item.lastIndexOf("Próxima: ") + 9).trim();
-                        LocalDate proxima = LocalDate.parse(fechaStr);
+                        LocalDate proxima = LocalDate.parse(fechaStr, java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"));
                         LocalDate hoy = LocalDate.now();
 
                         if (proxima.isBefore(hoy)) {

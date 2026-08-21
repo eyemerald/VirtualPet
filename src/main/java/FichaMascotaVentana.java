@@ -12,9 +12,11 @@ import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
+import javafx.stage.FileChooser;
 import org.kordamp.ikonli.feather.Feather;
 import org.kordamp.ikonli.javafx.FontIcon;
 
+import java.io.File;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -42,7 +44,7 @@ public class FichaMascotaVentana {
 
         Label infoBasica = new Label(
                 "Especie: " + datos[1] + "   |   Raza: " + datos[2] + "\n"
-                        + "Nacimiento: " + datos[3] + " (" + GestorMascotas.calcularEdad(datos[3]) + ")   |   Sexo: " + datos[4] + "\n"
+                        + "Nacimiento: " + UtilidadesFecha.formatearFechaES(datos[3]) + " (" + GestorMascotas.calcularEdad(datos[3]) + ")   |   Sexo: " + datos[4] + "\n"
                         + "Color: " + datos[5] + "   |   Microchip: " + datos[6]
         );
         infoBasica.getStyleClass().add("info-text");
@@ -67,15 +69,11 @@ public class FichaMascotaVentana {
         Label contenidoVacunas = crearContenidoTarjeta();
         Label contenidoTratamientos = crearContenidoTarjeta();
         Label contenidoPesos = crearContenidoTarjeta();
-        Label contenidoInformes = crearContenidoTarjeta();
-        Label contenidoNotas = crearContenidoTarjeta();
 
         Runnable refrescarTarjetas = () -> {
-            contenidoVacunas.setText(obtenerProximaVacuna(idMascota));
+            contenidoVacunas.setText(obtenerVacunasVencidasResumen(idMascota));
             contenidoTratamientos.setText(obtenerTratamientosResumen(idMascota));
             contenidoPesos.setText(obtenerUltimoPesoResumen(idMascota));
-            contenidoInformes.setText(obtenerInformesResumen(idMascota));
-            contenidoNotas.setText(obtenerNotasResumen(idMascota));
             avisoVacunas.setText(construirAvisoVacunas(idMascota));
         };
 
@@ -88,12 +86,12 @@ public class FichaMascotaVentana {
         VBox cardPesos = crearTarjetaClicable("Pesos", Feather.TRENDING_UP, "#4A9B7F", contenidoPesos,
                 () -> GestionPesosVentana.abrir(idMascota, refrescarTarjetas));
 
-        VBox cardInformes = crearTarjetaClicable("Informes", Feather.FILE_TEXT, "#5B7C99", contenidoInformes,
+        VBox cardInformes = crearTarjetaClicable("Informes", Feather.FILE_TEXT, "#5B7C99",
                 () -> GestionInformesVentana.abrir(idMascota, refrescarTarjetas));
 
         // Icono/color distinto (ámbar) para que destaque como "información
         // importante a leer", coherente con el color de aviso de vacunas
-        VBox cardNotas = crearTarjetaClicable("A tener en cuenta", Feather.ALERT_TRIANGLE, "#C4972E", contenidoNotas,
+        VBox cardNotas = crearTarjetaClicable("A tener en cuenta", Feather.ALERT_TRIANGLE, "#C4972E",
                 () -> GestionNotasVentana.abrir(idMascota, refrescarTarjetas));
 
         FlowPane filaTarjetas = new FlowPane(12, 12, cardVacunas, cardTratamientos, cardPesos, cardInformes, cardNotas);
@@ -132,13 +130,29 @@ public class FichaMascotaVentana {
 
             boolean esResumen = (seleccion.get() == btnResumen);
 
+            // El usuario elige dónde guardar el PDF (Escritorio, Documentos,
+            // donde quiera) en vez de que se guarde siempre en la carpeta
+            // interna de la aplicación, que casi nadie conoce ni sabe encontrar.
+            FileChooser chooser = new FileChooser();
+            chooser.setTitle("Guardar ficha en PDF");
+            chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("PDF", "*.pdf"));
+            chooser.setInitialFileName(ExportadorMascota.nombreSugerido(idMascota, esResumen));
+
+            // Carpeta inicial amigable: Escritorio si existe, si no el
+            // directorio de usuario — mejor punto de partida que %APPDATA%
+            File escritorio = new File(System.getProperty("user.home"), "Desktop");
+            chooser.setInitialDirectory(escritorio.exists() ? escritorio : new File(System.getProperty("user.home")));
+
+            File destino = chooser.showSaveDialog(Navegador.getEscenario());
+            if (destino == null) return; // el usuario canceló el diálogo
+
             botonExportar.setDisable(true);
             new Thread(() -> {
                 try {
-                    ExportadorMascota.exportarFicha(idMascota, esResumen);
+                    ExportadorMascota.exportarFicha(idMascota, esResumen, destino);
                     javafx.application.Platform.runLater(() -> {
                         String tipoTexto = esResumen ? "Resumen" : "Completo";
-                        mostrarAviso(AlertType.INFORMATION, "PDF (" + tipoTexto + ") generado correctamente.");
+                        mostrarAviso(AlertType.INFORMATION, "PDF (" + tipoTexto + ") generado correctamente en:\n" + destino.getAbsolutePath());
                         botonExportar.setDisable(false);
                     });
                 } catch (Exception e) {
@@ -176,7 +190,7 @@ public class FichaMascotaVentana {
                 }
             }
 
-            VirtuaPetApp.cargarListaMascotas();
+            VirtualPetApp.cargarListaMascotas();
             Navegador.volverAlInicio();
         });
 
@@ -199,6 +213,7 @@ public class FichaMascotaVentana {
         contenido.getStyleClass().add("card-content");
         contenido.setWrapText(true);
         contenido.setMaxWidth(190);
+        contenido.setAlignment(Pos.CENTER);
         return contenido;
     }
 
@@ -227,6 +242,31 @@ public class FichaMascotaVentana {
         return tarjeta;
     }
 
+    private static VBox crearTarjetaClicable(String titulo, Feather icono, String colorHex, Runnable alHacer) {
+        Label tituloLabel = new Label(titulo);
+        tituloLabel.getStyleClass().add("card-title");
+
+        FontIcon fontIcon = new FontIcon(icono);
+        fontIcon.setIconSize(24);
+        fontIcon.setIconColor(Color.web(colorHex));
+
+        VBox tarjeta = new VBox(6, fontIcon, tituloLabel);
+        tarjeta.getStyleClass().add("card");
+        tarjeta.getStyleClass().add("clickable-card");
+        tarjeta.setPadding(new Insets(12));
+        tarjeta.setPrefWidth(200);
+        tarjeta.setMinHeight(90);
+        tarjeta.setAlignment(Pos.TOP_CENTER);
+
+        tarjeta.setOnMouseClicked(evento -> {
+            if (evento.getButton() == MouseButton.PRIMARY && evento.getClickCount() == 1) {
+                alHacer.run();
+            }
+        });
+
+        return tarjeta;
+    }
+
     static String construirAvisoVacunas(int idMascota) {
         ArrayList<String> vacunas = GestorMascotas.obtenerLineasVacunas(idMascota);
         int contador = 0;
@@ -238,30 +278,22 @@ public class FichaMascotaVentana {
         return "⚠ " + contador + " vacuna(s) vencida(s) o próxima(s) — revisa el detalle en Gestionar vacunas";
     }
 
-    private static String obtenerProximaVacuna(int idMascota) {
+    private static String obtenerVacunasVencidasResumen(int idMascota) {
         ArrayList<String[]> vacunas = GestorMascotas.obtenerVacunasConId(idMascota);
-        if (vacunas.isEmpty()) return "Sin vacunas";
+        if (vacunas.isEmpty()) return "Sin vencidas";
 
         LocalDate hoy = LocalDate.now();
-        LocalDate fechaMasProxima = null;
-        String nombreVacuna = "";
+        int vencidas = 0;
 
         for (String[] v : vacunas) {
             LocalDate fechaProxima = LocalDate.parse(v[3]);
-            if (fechaMasProxima == null || fechaProxima.isBefore(fechaMasProxima)) {
-                fechaMasProxima = fechaProxima;
-                nombreVacuna = v[1];
+            if (fechaProxima.isBefore(hoy)) {
+                vencidas++;
             }
         }
 
-        if (fechaMasProxima == null) return "Sin vacunas";
-
-        if (fechaMasProxima.isBefore(hoy)) {
-            return nombreVacuna + "\nVencida";
-        } else {
-            long diasFaltantes = ChronoUnit.DAYS.between(hoy, fechaMasProxima);
-            return nombreVacuna + "\nPróxima en " + diasFaltantes + " días";
-        }
+        if (vencidas == 0) return "Sin vencidas";
+        return vencidas + " vencida" + (vencidas > 1 ? "s" : "");
     }
 
     private static String obtenerTratamientosResumen(int idMascota) {
@@ -307,25 +339,6 @@ public class FichaMascotaVentana {
         return pesoMasReciente[2] + " kg";
     }
 
-    private static String obtenerInformesResumen(int idMascota) {
-        ArrayList<String[]> informes = GestorMascotas.obtenerInformesConId(idMascota);
-        if (informes.isEmpty()) return "Sin documentos";
-
-        return informes.size() + " documento" + (informes.size() > 1 ? "s" : "");
-    }
-
-    private static String obtenerNotasResumen(int idMascota) {
-        ArrayList<String[]> notas = GestorMascotas.obtenerNotasConId(idMascota);
-        if (notas.isEmpty()) return "Sin notas";
-
-        // Ya vienen ordenadas por id descendente (ver GestorMascotas),
-        // así que la primera es la más reciente
-        String textoMasReciente = notas.get(0)[1];
-        if (textoMasReciente.length() > 60) {
-            textoMasReciente = textoMasReciente.substring(0, 60) + "...";
-        }
-        return textoMasReciente;
-    }
 
     static void mostrarAviso(AlertType tipo, String mensaje) {
         Alert alerta = new Alert(tipo, mensaje);

@@ -3,11 +3,11 @@ import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
+import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 
 import java.io.IOException;
+import java.net.URL;
 import java.util.ArrayList;
-import java.nio.file.Path;
-import java.nio.file.Files;
 import java.time.format.DateTimeFormatter;
 import java.time.LocalDateTime;
 
@@ -44,7 +44,27 @@ public class ExportadorMascota {
         contenido.stroke();
     }
 
-    static void exportarFicha(int idMascota, boolean esResumen) {
+    // Genera el nombre sugerido por defecto (fecha/hora incluida para no
+    // chocar con exportaciones anteriores), para que el FileChooser lo
+    // proponga ya relleno y el usuario solo tenga que elegir la carpeta.
+    static String nombreSugerido(int idMascota, boolean esResumen) {
+        String[] datos = GestorMascotas.obtenerDatosBasicos(idMascota);
+        String nombreMascota = (datos == null || datos[0] == null) ? "mascota" : datos[0];
+        String safeName = nombreMascota.replaceAll("[^a-zA-Z0-9-_.]", "_");
+        if (safeName.length() > 50) safeName = safeName.substring(0, 50);
+
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd_HHmmss");
+        String timestamp = LocalDateTime.now().format(fmt);
+        String sufijo = esResumen ? "_resumen_" : "_completo_";
+        return safeName + sufijo + timestamp + ".pdf";
+    }
+
+    // Ahora recibe el archivo destino elegido por el propio usuario (con un
+    // FileChooser en FichaMascotaVentana), en vez de guardarlo siempre en la
+    // carpeta interna de la aplicación — la mayoría de usuarios no conoce
+    // ni sabe llegar a %APPDATA%, así que dejamos que elijan dónde guardarlo
+    // (Escritorio, Documentos, donde prefieran).
+    static void exportarFicha(int idMascota, boolean esResumen, java.io.File destino) {
 
         String[] datos = GestorMascotas.obtenerDatosBasicos(idMascota);
         if (datos == null) {
@@ -60,6 +80,21 @@ public class ExportadorMascota {
             documento.addPage(pagina);
 
             try (PDPageContentStream contenido = new PDPageContentStream(documento, pagina)) {
+
+                // --- Logo en la cabecera ---
+                URL logoUrl = ExportadorMascota.class.getResource("/images/logo.png");
+                if (logoUrl != null) {
+                    try {
+                        PDImageXObject logoImage = PDImageXObject.createFromByteArray(documento, 
+                            logoUrl.openStream().readAllBytes(), "logo.png");
+                        float logoWidth = 50;
+                        float logoHeight = 50 * (float)logoImage.getHeight() / logoImage.getWidth();
+                        contenido.drawImage(logoImage, margen, y - logoHeight, logoWidth, logoHeight);
+                        margen += logoWidth + 15;
+                    } catch (Exception e) {
+                        AppLogger.logWarning("No se pudo cargar el logo en el PDF: " + e.getMessage());
+                    }
+                }
 
                 // --- Cabecera con los datos básicos ---
                 String tituloPDF = esResumen ? "Ficha Resumen - " + datos[0] : "Ficha Clínica Completa - " + datos[0];
@@ -96,31 +131,10 @@ public class ExportadorMascota {
                 }
             }
 
-            // Sanitizamos el nombre de archivo
-            String nombreMascota = (datos[0] == null) ? "mascota" : datos[0];
-            String safeName = nombreMascota.replaceAll("[^a-zA-Z0-9-_.]", "_");
-            if (safeName.length() > 50) safeName = safeName.substring(0, 50);
-
-            try {
-                GestorArchivos.crearCarpetaMascota(idMascota, nombreMascota);
-            } catch (Exception e) {
-                AppLogger.logSevere("No se pudo crear la carpeta de la mascota: " + e.getMessage());
-            }
-
-            DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd_HHmmss");
-            String timestamp = LocalDateTime.now().format(fmt);
-            String sufijo = esResumen ? "_resumen_" : "_completo_";
-            String nombreArchivo = safeName + sufijo + timestamp + ".pdf";
-
-            Path carpeta = RutasApp.getCarpetaMascotas().resolve(idMascota + "_" + GestorArchivos.safeName(nombreMascota));
-            try {
-                if (!Files.exists(carpeta)) Files.createDirectories(carpeta);
-                Path destino = carpeta.resolve(nombreArchivo);
-                documento.save(destino.toString());
-                AppLogger.logInfo("PDF generado correctamente: " + destino.toString());
-            } catch (IOException e) {
-                AppLogger.logSevere("Error al guardar el PDF en la carpeta de la mascota: " + e.getMessage());
-            }
+            // Guardamos directamente donde el usuario eligió con el
+            // FileChooser — ya no calculamos nosotros ninguna carpeta.
+            documento.save(destino.getAbsolutePath());
+            AppLogger.logInfo("PDF generado correctamente: " + destino.getAbsolutePath());
 
         } catch (IOException e) {
             AppLogger.logSevere("Error al generar el PDF: " + e.getMessage());

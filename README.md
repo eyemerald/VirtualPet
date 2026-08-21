@@ -1,4 +1,4 @@
-# VirtuaPet
+# VirtualPet
 
 Aplicación de gestión de historiales médicos de mascotas, desarrollada en Java con interfaz JavaFX y persistencia local en SQLite.
 
@@ -30,7 +30,7 @@ mvn -DskipTests package
 mvn javafx:run
 ```
 
-O desde IntelliJ: botón ▶️ sobre el método `main` en `VirtuaPetApp.java`.
+O desde IntelliJ: botón ▶️ sobre el método `main` en `VirtualPetApp.java`.
 
 ## Pendiente / próximos pasos
 
@@ -39,7 +39,7 @@ O desde IntelliJ: botón ▶️ sobre el método `main` en `VirtuaPetApp.java`.
 - **Desplegable de vacunas**: catálogo de vacunas habituales por especie en vez de campo de texto libre.
 - **Limpieza de logging**: unificar todos los `System.out.println` de `GestorMascotas.java` para que usen `AppLogger`, igual que ya hacen `CrearTablas` y `ExportadorMascota`.
 - **Backup manual**: importación/exportación de la base de datos para copias de seguridad.
-- Ver roadmap completo en `VirtuaPet-roadmap.md` (funcionalidades a más largo plazo: freemium, publicidad, etc.)
+- Ver roadmap completo en `VirtualPet-roadmap.md` (funcionalidades a más largo plazo: freemium, publicidad, etc.)
 
 ## Notas de arquitectura para el futuro
 

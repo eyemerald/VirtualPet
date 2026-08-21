@@ -4,7 +4,7 @@ import java.util.logging.Logger;
 import java.util.logging.SimpleFormatter;
 
 public class AppLogger {
-    private static final Logger LOGGER = Logger.getLogger("VirtuaPet");
+    private static final Logger LOGGER = Logger.getLogger("VirtualPet");
 
     static {
         try {

@@ -57,11 +57,50 @@ public class GestionPesosVentana {
             return scrollVacio;
         }
 
-        LineChart<Number, Number> grafico = crearGraficoPeso(pesos);
+        // Botones de filtro para el gráfico
+        Button filtroTodo = new Button("Todo");
+        Button filtroAnual = new Button("Último año");
+        Button filtroMensual = new Button("Mensual");
+        
+        filtroTodo.getStyleClass().add("btn-primary");
+        filtroAnual.getStyleClass().add("button");
+        filtroMensual.getStyleClass().add("button");
+        
+        HBox filaFiltros = new HBox(8, filtroTodo, filtroAnual, filtroMensual);
+        filaFiltros.setPadding(new Insets(0, 0, 10, 0));
+        
+        // Variable para almacenar el filtro actual (días: 0 = todo)
+        final int[] diasFiltro = {0};
+        
+        LineChart<Number, Number> grafico = crearGraficoPeso(pesos, diasFiltro[0]);
+        
+        filtroTodo.setOnAction(e -> {
+            diasFiltro[0] = 0;
+            filtroTodo.getStyleClass().setAll("btn-primary");
+            filtroAnual.getStyleClass().setAll("button");
+            filtroMensual.getStyleClass().setAll("button");
+            actualizarGrafico(grafico, pesos, diasFiltro[0]);
+        });
+        
+        filtroAnual.setOnAction(e -> {
+            diasFiltro[0] = 365;
+            filtroTodo.getStyleClass().setAll("button");
+            filtroAnual.getStyleClass().setAll("btn-primary");
+            filtroMensual.getStyleClass().setAll("button");
+            actualizarGrafico(grafico, pesos, diasFiltro[0]);
+        });
+        
+        filtroMensual.setOnAction(e -> {
+            diasFiltro[0] = 30;
+            filtroTodo.getStyleClass().setAll("button");
+            filtroAnual.getStyleClass().setAll("button");
+            filtroMensual.getStyleClass().setAll("btn-primary");
+            actualizarGrafico(grafico, pesos, diasFiltro[0]);
+        });
 
         ListView<String> lista = new ListView<>();
         for (String[] p : pesos) {
-            lista.getItems().add(p[1] + ": " + p[2] + " kg");
+            lista.getItems().add(UtilidadesFecha.formatearFechaES(p[1]) + ": " + p[2] + " kg");
         }
 
         DatePicker campoFecha = new DatePicker();
@@ -185,6 +224,7 @@ public class GestionPesosVentana {
 
         VBox.setVgrow(lista, Priority.ALWAYS);
         VBox centroContenido = new VBox(8,
+                filaFiltros,
                 grafico,
                 new Label("Selecciona el registro a modificar:"),
                 lista
@@ -207,14 +247,31 @@ public class GestionPesosVentana {
         return scroll;
     }
 
-    private static LineChart<Number, Number> crearGraficoPeso(ArrayList<String[]> pesos) {
+    private static LineChart<Number, Number> crearGraficoPeso(ArrayList<String[]> pesos, int diasFiltro) {
         ArrayList<String[]> ordenados = new ArrayList<>(pesos);
         ordenados.sort(Comparator.comparing(p -> LocalDate.parse(p[1])));
+        
+        // Aplicar filtro de fechas si es necesario
+        if (diasFiltro > 0) {
+            LocalDate fechaLimite = LocalDate.now().minusDays(diasFiltro);
+            ordenados.removeIf(p -> LocalDate.parse(p[1]).isBefore(fechaLimite));
+        }
+        
+        if (ordenados.isEmpty()) {
+            // Crear gráfico vacío si no hay datos después del filtro
+            NumberAxis ejeX = new NumberAxis();
+            NumberAxis ejeY = new NumberAxis();
+            LineChart<Number, Number> grafico = new LineChart<>(ejeX, ejeY);
+            grafico.setTitle("Sin datos en este rango");
+            grafico.setLegendVisible(false);
+            grafico.setPrefHeight(220);
+            grafico.setAnimated(false);
+            return grafico;
+        }
 
         LocalDate fechaBase = LocalDate.parse(ordenados.get(0)[1]);
 
         NumberAxis ejeX = new NumberAxis();
-        ejeX.setLabel("Fecha");
         ejeX.setForceZeroInRange(false);
         ejeX.setTickLabelFormatter(new StringConverter<Number>() {
             final DateTimeFormatter formato = DateTimeFormatter.ofPattern("MMM");
@@ -232,7 +289,6 @@ public class GestionPesosVentana {
         });
 
         NumberAxis ejeY = new NumberAxis();
-        ejeY.setLabel("Peso (kg)");
         ejeY.setForceZeroInRange(false);
 
         LineChart<Number, Number> grafico = new LineChart<>(ejeX, ejeY);
@@ -264,6 +320,49 @@ public class GestionPesosVentana {
         }
 
         return grafico;
+    }
+    
+    private static void actualizarGrafico(LineChart<Number, Number> grafico, ArrayList<String[]> pesos, int diasFiltro) {
+        grafico.getData().clear();
+        
+        ArrayList<String[]> ordenados = new ArrayList<>(pesos);
+        ordenados.sort(Comparator.comparing(p -> LocalDate.parse(p[1])));
+        
+        // Aplicar filtro de fechas si es necesario
+        if (diasFiltro > 0) {
+            LocalDate fechaLimite = LocalDate.now().minusDays(diasFiltro);
+            ordenados.removeIf(p -> LocalDate.parse(p[1]).isBefore(fechaLimite));
+        }
+        
+        if (ordenados.isEmpty()) {
+            grafico.setTitle("Sin datos en este rango");
+            return;
+        }
+        
+        grafico.setTitle("Evolución de peso");
+        
+        LocalDate fechaBase = LocalDate.parse(ordenados.get(0)[1]);
+        
+        XYChart.Series<Number, Number> serie = new XYChart.Series<>();
+        for (String[] p : ordenados) {
+            LocalDate fecha = LocalDate.parse(p[1]);
+            long dias = ChronoUnit.DAYS.between(fechaBase, fecha);
+            double peso = Double.parseDouble(p[2]);
+            
+            XYChart.Data<Number, Number> punto = new XYChart.Data<>(dias, peso);
+            serie.getData().add(punto);
+        }
+        grafico.getData().add(serie);
+        
+        for (XYChart.Data<Number, Number> punto : serie.getData()) {
+            javafx.scene.Node nodo = punto.getNode();
+            if (nodo != null) {
+                LocalDate fechaPunto = fechaBase.plusDays(punto.getXValue().longValue());
+                javafx.scene.control.Tooltip.install(nodo, new javafx.scene.control.Tooltip(
+                        fechaPunto.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) + "  —  " + punto.getYValue() + " kg"
+                ));
+            }
+        }
     }
 
     private static void mostrarAviso(String mensaje) {

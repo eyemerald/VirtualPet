@@ -98,23 +98,23 @@
 
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-assembly-plugin</artifactId>
-                <version>3.6.0</version>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.5.1</version>
                 <executions>
                     <execution>
                         <phase>package</phase>
                         <goals>
-                            <goal>single</goal>
+                            <goal>shade</goal>
                         </goals>
                         <configuration>
-                            <archive>
-                                <manifest>
+                            <shadedArtifactAttached>false</shadedArtifactAttached>
+                            <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                                     <mainClass>Launcher</mainClass>
-                                </manifest>
-                            </archive>
-                            <descriptorRefs>
-                                <descriptorRef>jar-with-dependencies</descriptorRef>
-                            </descriptorRefs>
+                                </transformer>
+                            </transformers>
+                            <finalName>virtuapet-1.0-SNAPSHOT-jar-with-dependencies</finalName>
                         </configuration>
                     </execution>
                 </executions>
@@ -126,6 +126,30 @@
                 <version>3.3.1</version>
                 <configuration>
                     <encoding>UTF-8</encoding>
+                </configuration>
+            </plugin>
+
+            <!-- Plugin jpackage para crear instaladores nativos -->
+            <plugin>
+                <groupId>org.panteleyev</groupId>
+                <artifactId>jpackage-maven-plugin</artifactId>
+                <version>1.6.0</version>
+                <configuration>
+                    <name>VirtualPet</name>
+                    <appVersion>1.0.0</appVersion>
+                    <vendor>eyemerald</vendor>
+                    <destination>target/installer</destination>
+                    <input>target</input>
+                    <mainJar>virtuapet-1.0-SNAPSHOT-jar-with-dependencies.jar</mainJar>
+                    <mainClass>Launcher</mainClass>
+                    <resourceDir>src/main/resources</resourceDir>
+                    <icon>src/main/resources/images/icon.ico</icon>
+                    <javaOptions>
+                        <option>-Dfile.encoding=UTF-8</option>
+                    </javaOptions>
+                    <winMenu>true</winMenu>
+                    <winDirChooser>true</winDirChooser>
+                    <winShortcut>true</winShortcut>
                 </configuration>
             </plugin>
         </plugins>

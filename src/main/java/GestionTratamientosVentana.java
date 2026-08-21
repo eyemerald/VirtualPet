@@ -49,7 +49,7 @@ public class GestionTratamientosVentana {
 
         ListView<String> lista = new ListView<>();
         for (String[] t : tratamientos) {
-            String textoFin = t[5].isEmpty() ? "crónico/indefinido" : "hasta " + t[5];
+            String textoFin = t[5].isEmpty() ? "crónico/indefinido" : "hasta " + UtilidadesFecha.formatearFechaES(t[5]);
             lista.getItems().add(t[1] + " (" + t[2] + ") - " + textoFin);
         }
 

@@ -1,4 +1,4 @@
-/* ============ PALETA VirtuaPet ============
+/* ============ PALETA VirtualPet ============
    Acento principal:   #4A9B7F (verde salvia)
    Acento hover:       #3D8069
    Secundario:         #5B7C99 (azul grisáceo)
@@ -79,7 +79,8 @@
 /* Contenido (resumen) dentro de la tarjeta */
 .card-content {
     -fx-text-fill: #6B7680;
-    -fx-font-size: 12px;
+    -fx-font-size: 15px;
+    -fx-text-alignment: center;
 }
 
 /* Botones estándar */

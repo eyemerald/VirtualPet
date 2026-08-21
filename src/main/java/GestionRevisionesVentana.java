@@ -52,7 +52,7 @@ public class GestionRevisionesVentana {
 
         ListView<String> lista = new ListView<>();
         for (String[] r : revisiones) {
-            lista.getItems().add(r[1] + " - " + r[2]);
+            lista.getItems().add(UtilidadesFecha.formatearFechaES(r[1]) + " - " + r[2]);
         }
 
         DatePicker campoFecha = new DatePicker();

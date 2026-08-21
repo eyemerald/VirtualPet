@@ -60,8 +60,8 @@ static String safeName(String s) {
         });
     }
 
-    // Genera un único .zip con TODO lo que VirtuaPet guarda: la base de
-    // datos (virtuapet.db) y la carpeta "mascotas" completa (todas las
+    // Genera un único .zip con TODO lo que VirtualPet guarda: la base de
+    // datos (virtualpet.db) y la carpeta "mascotas" completa (todas las
     // subcarpetas, con sus PDFs e informes). Pensado como copia de
     // seguridad manual — y, el día de mañana, como el mismo formato que
     // la app Android podría leer para importar los datos vía WiFi.

@@ -263,6 +263,25 @@ public class GestorMascotas {
         }
     }
 
+    // Actualiza solo los metadatos (tipo, descripción, fecha) de un informe
+    // ya existente. NO toca el archivo físico ni su ruta — para reemplazar
+    // el archivo en sí habría que borrar el informe y crear uno nuevo.
+    static void actualizarInforme(int idInforme, String tipo, String descripcion, String fecha) {
+        String sql = "UPDATE informes SET tipo = ?, descripcion = ?, fecha = ? WHERE id = ?";
+
+        try (Connection conexion = abrirConexion();
+             PreparedStatement ps = conexion.prepareStatement(sql)) {
+            ps.setString(1, tipo);
+            ps.setString(2, descripcion);
+            ps.setString(3, fecha);
+            ps.setInt(4, idInforme);
+            ps.executeUpdate();
+            AppLogger.logInfo("Informe actualizado (id " + idInforme + ").");
+        } catch (SQLException e) {
+            AppLogger.logSevere("Error al actualizar el informe: " + e.getMessage());
+        }
+    }
+
     static ArrayList<String[]> obtenerInformesConId(int idMascota) {
         ArrayList<String[]> lista = new ArrayList<>();
         String sql = "SELECT id, tipo, descripcion, fecha, nombreArchivo, rutaArchivo FROM informes WHERE mascota_id = ?";

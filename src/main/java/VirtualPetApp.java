@@ -9,6 +9,8 @@ import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.input.MouseButton;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.FlowPane;
@@ -28,7 +30,7 @@ import java.net.URL;
 import java.time.LocalDate;
 import java.util.ArrayList;
 
-public class VirtuaPetApp extends Application {
+public class VirtualPetApp extends Application {
 
     static FlowPane contenedorMascotas = new FlowPane();
     static ArrayList<Integer> idsMascotas = new ArrayList<>();
@@ -46,6 +48,12 @@ public class VirtuaPetApp extends Application {
 
         CrearTablas.crearTablas();
 
+        // Icono de la ventana
+        URL logoUrl = VirtualPetApp.class.getResource("/images/logo.png");
+        if (logoUrl != null) {
+            escenario.getIcons().add(new Image(logoUrl.toExternalForm()));
+        }
+
         Button botonAtras = new Button();
         FontIcon iconoAtras = new FontIcon(Feather.ARROW_LEFT);
         iconoAtras.setIconSize(18);
@@ -53,8 +61,19 @@ public class VirtuaPetApp extends Application {
         botonAtras.setStyle("-fx-background-color: transparent; -fx-cursor: hand; -fx-padding: 4 8 4 8;");
         botonAtras.setOnAction(evento -> Navegador.volverAtras());
 
-        Label tituloVentana = new Label("VirtuaPet");
+        // Logo y título de la ventana
+        ImageView logoView = new ImageView();
+        if (logoUrl != null) {
+            logoView.setImage(new Image(logoUrl.toExternalForm()));
+            logoView.setFitHeight(24);
+            logoView.setPreserveRatio(true);
+        }
+        
+        Label tituloVentana = new Label("VirtualPet");
         tituloVentana.setStyle("-fx-font-size: 18px; -fx-font-weight: bold;");
+        
+        HBox headerContent = new HBox(8, logoView, tituloVentana);
+        headerContent.setAlignment(Pos.CENTER_LEFT);
 
         // Zona "vacía" a la derecha del título: es la parte de la barra
         // que se puede arrastrar para mover la ventana (los botones no,
@@ -92,7 +111,7 @@ public class VirtuaPetApp extends Application {
         botonCerrar.setOnMouseExited(e -> botonCerrar.setStyle(
                 "-fx-background-color: transparent; -fx-cursor: hand; -fx-padding: 6 10 6 10;"));
 
-        HBox topBar = new HBox(10, botonAtras, tituloVentana, espacioArrastrable, botonMinimizar, botonMaximizar, botonCerrar);
+        HBox topBar = new HBox(10, botonAtras, headerContent, espacioArrastrable, botonMinimizar, botonMaximizar, botonCerrar);
         topBar.setAlignment(Pos.CENTER_LEFT);
         topBar.setPadding(new Insets(10, 10, 10, 14));
         topBar.setStyle("-fx-background-color: #FFFFFF; -fx-border-color: #E0E0E0; -fx-border-width: 0 0 1 0;");
@@ -110,13 +129,13 @@ public class VirtuaPetApp extends Application {
             escenario.setX(evento.getScreenX() - offsetX[0]);
             escenario.setY(evento.getScreenY() - offsetY[0]);
         });
-        // El título también sirve para arrastrar, es la zona más natural
+        // El headerContent también sirve para arrastrar, es la zona más natural
         // donde la gente intenta mover una ventana
-        tituloVentana.setOnMousePressed(evento -> {
+        headerContent.setOnMousePressed(evento -> {
             offsetX[0] = evento.getSceneX();
             offsetY[0] = evento.getSceneY();
         });
-        tituloVentana.setOnMouseDragged(evento -> {
+        headerContent.setOnMouseDragged(evento -> {
             escenario.setX(evento.getScreenX() - offsetX[0]);
             escenario.setY(evento.getScreenY() - offsetY[0]);
         });
@@ -125,7 +144,7 @@ public class VirtuaPetApp extends Application {
         raiz.setTop(topBar);
 
         Navegador.inicializar(escenario, raiz, botonAtras, tituloVentana);
-        Navegador.navegarA("VirtuaPet", VirtuaPetApp::crearVistaInicio);
+        Navegador.navegarA("VirtualPet", VirtualPetApp::crearVistaInicio);
 
         // Limitamos el tamaño al espacio real disponible en la pantalla
         // (dejando margen para la barra de tareas), en vez de forzar
@@ -137,12 +156,12 @@ public class VirtuaPetApp extends Application {
 
         Scene escena = new Scene(raiz, ancho, alto);
         
-        URL cssUrl = VirtuaPetApp.class.getResource("/styles.css");
+        URL cssUrl = VirtualPetApp.class.getResource("/styles.css");
         if (cssUrl != null) {
             escena.getStylesheets().add(cssUrl.toExternalForm());
         }
 
-        escenario.setTitle("VirtuaPet");
+        escenario.setTitle("VirtualPet");
         escenario.setScene(escena);
         escenario.centerOnScreen();
         escenario.show();

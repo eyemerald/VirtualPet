@@ -232,7 +232,7 @@ public class FormularioMascota {
                         GestorMascotas.guardarMascota(datos);
                     }
                     javafx.application.Platform.runLater(() -> {
-                        VirtuaPetApp.cargarListaMascotas();
+                        VirtualPetApp.cargarListaMascotas();
                         if (esEdicion) {
                             Navegador.volverAtras();
                         } else {
