@@ -136,7 +136,7 @@
                 <version>1.6.0</version>
                 <configuration>
                     <name>VirtualPet</name>
-                    <appVersion>1.0.0</appVersion>
+                    <appVersion>1.0.1</appVersion>
                     <vendor>eyemerald</vendor>
                     <destination>target/installer</destination>
                     <input>target</input>

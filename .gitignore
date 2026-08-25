@@ -49,3 +49,5 @@ instalador/
 
 ### Continue (config local, no del proyecto) ###
 .continue/
+
+dependency-reduced-pom.xml
